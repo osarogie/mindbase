@@ -22,3 +22,4 @@ mobile/package-lock.json
 .serena/
 vault/
 /.expo
+.worktrees/

@@ -1,0 +1,16 @@
+bin/
+tmp/
+web/dist/
+node_modules/
+web/node_modules/
+mobile/node_modules/
+mobile/ios/
+mobile/android/
+macos/build/
+*.app
+.DS_Store
+package-lock.json
+web/package-lock.json
+mobile/package-lock.json
+.cursor/
+vault/.mindbase/secrets.json

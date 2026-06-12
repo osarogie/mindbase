@@ -1,0 +1,35 @@
+# mindbase dev — hot reload via `go tool air` (see go.mod tool block)
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  pre_cmd = ["go tool templ generate ./internal/ui/templates/..."]
+  cmd = "go build -o ./tmp/main ./cmd/mindbase"
+  entrypoint = ["./tmp/main", "-vault", "./vault", "-addr", ":8090"]
+  include_ext = ["go", "templ"]
+  exclude_dir = [
+    "tmp",
+    "bin",
+    "vault",
+    "web",
+    "mobile",
+    "macos",
+    "node_modules",
+    "desktop",
+    ".git",
+    ".cursor",
+  ]
+  exclude_regex = ["_test\\.go"]
+  delay = 300
+  stop_on_error = true
+  send_interrupt = true
+  kill_delay = 500
+
+[log]
+  time = true
+
+[misc]
+  clean_on_exit = true
+
+[screen]
+  clear_on_rebuild = true

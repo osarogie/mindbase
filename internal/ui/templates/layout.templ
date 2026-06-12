@@ -1,0 +1,629 @@
+package templates
+
+import "github.com/osarogie/mindbase/internal/connectors"
+
+templ Layout(data PageData) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+			<meta name="apple-mobile-web-app-capable" content="yes"/>
+			<meta name="theme-color" content="#0f0f14"/>
+			<link rel="icon" href="/static/icons/favicon.svg" type="image/svg+xml"/>
+			<link rel="icon" href="/static/icons/favicon-32.png" sizes="32x32" type="image/png"/>
+			<link rel="icon" href="/static/icons/favicon-16.png" sizes="16x16" type="image/png"/>
+			<link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png"/>
+			<title>{ data.VaultName } · mindbase</title>
+			<script src="https://unpkg.com/htmx.org@2.0.4"></script>
+			<script defer src="https://unpkg.com/alpinejs@3.14.8/dist/cdn.min.js"></script>
+			<link rel="stylesheet" href="https://uicdn.toast.com/editor/latest/toastui-editor.min.css"/>
+			<link rel="stylesheet" href="/static/app.css"/>
+		</head>
+		<body x-data="{ sidebar: false, mode: 'split' }" hx-ext="sse">
+			<div class="app">
+				<div class="sidebar-backdrop" x-show="sidebar" x-cloak @click="sidebar=false"></div>
+				<aside class="sidebar" :class="{ open: sidebar }">
+					<div class="sidebar-header">
+						<img src="/static/icons/favicon-32.png" alt="" class="app-logo" width="24" height="24"/>
+						<h1>mindbase</h1>
+						<button type="button" class="icon-btn mobile-only" @click="sidebar=false">✕</button>
+					</div>
+					if data.View != "connectors" {
+						@JournalNav(data.JournalDays)
+						@TasksNav(data.OpenTaskCount)
+						if len(data.PopularTags) > 0 {
+							@TagNav(data.PopularTags, data.ActiveTag)
+						}
+					}
+					<form class="search-box" hx-get="/search" hx-target="#search-results" hx-trigger="input changed delay:200ms, submit">
+						<input type="search" name="q" placeholder="Search notes & databases…" value={ data.SearchQ } autocomplete="off"/>
+					</form>
+					<div id="search-results">
+						if len(data.Results) > 0 {
+							@SearchResults(data.Results)
+						}
+					</div>
+					<div class="view-tabs">
+						<a href="/" class={ tabClass(data.View == "library" || data.View == "notes" || data.View == "databases") }>Library</a>
+						<a href="/connectors" class={ tabClass(data.View == "connectors") } hx-get="/connectors" hx-target="#main" hx-push-url="true">Connect</a>
+					</div>
+					if data.View != "connectors" {
+						@VaultFolderList(data.FolderSections)
+					}
+				</aside>
+				<button type="button" class="menu-btn mobile-only" @click="sidebar=true">☰</button>
+				<main id="main" class="main">
+					<div class="vault-badge">{ data.VaultName }</div>
+					@MainContent(data)
+				</main>
+			</div>
+			<div id="sync-status" hx-get="/sync/status" hx-trigger="load, every 30s" hx-swap="innerHTML"></div>
+			<div x-data="aiAssistant()" @open-ai.window="open=true">
+				<button type="button" class="ai-fab" x-show="!open" @click="open=true" title="Ask Claude">✦</button>
+				<div class="ai-panel" x-show="open" x-cloak>
+					<div class="ai-panel-header">
+						<h3>Claude · Headroom · RTK</h3>
+						<button type="button" class="icon-btn" @click="open=false">✕</button>
+					</div>
+					<div class="ai-messages">
+						<template x-for="(m, i) in messages" :key="i">
+							<div class="ai-msg" :class="m.role" x-text="m.text"></div>
+						</template>
+						<p class="muted" x-show="!messages.length">Ask about your vault, current note, or anything.</p>
+					</div>
+					<div class="ai-meta" x-show="meta" x-text="meta"></div>
+					<div class="ai-input-row">
+						<input type="text" placeholder="Ask Claude…" x-model="input" @keydown.enter.prevent="send()" :disabled="loading"/>
+						<button type="button" class="primary" @click="send()" :disabled="loading">Send</button>
+					</div>
+				</div>
+			</div>
+			<script src="https://uicdn.toast.com/editor/latest/toastui-editor-all.min.js"></script>
+			<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+			<script type="module" src="/static/app.js"></script>
+		</body>
+	</html>
+}
+
+func tabClass(active bool) string {
+	if active {
+		return "tab active"
+	}
+	return "tab"
+}
+
+templ JournalNav(days []JournalDay) {
+	<nav class="journal-nav">
+		<div class="sidebar-section-label">Calendar</div>
+		for _, day := range days {
+			if day.Date == "week" {
+				<a href="/journal/week" class="journal-link" hx-get="/journal/week" hx-target="#main" hx-push-url="true">
+					<span>📅</span> { day.Label }
+				</a>
+			} else {
+				<a href={ templ.SafeURL("/journal/" + day.Date) } class={ journalClass(day.Active) } hx-get={ "/journal/" + day.Date } hx-target="#main" hx-push-url="true">
+					<span>🗓</span> { day.Label }
+				</a>
+			}
+		}
+	</nav>
+}
+
+func journalClass(active bool) string {
+	if active {
+		return "journal-link active"
+	}
+	return "journal-link"
+}
+
+templ TasksNav(count int) {
+	<a href="/tasks" class="tasks-nav-link" hx-get="/tasks" hx-target="#main" hx-push-url="true">
+		<span>☑</span> Open tasks
+		if count > 0 {
+			<span class="badge">{ formatInt(count) }</span>
+		}
+	</a>
+}
+
+templ TagNav(tags []TagItem, active string) {
+	<div class="tag-nav">
+		<div class="sidebar-section-label">Tags</div>
+		<div class="tag-chips">
+			for _, tag := range tags {
+				<a href={ templ.SafeURL("/tags/" + tag.Tag) } class={ tagClass(tag.Tag == active) } hx-get={ "/tags/" + tag.Tag } hx-target="#main" hx-push-url="true">
+					#{ tag.Tag } <small>{ formatInt(tag.Count) }</small>
+				</a>
+			}
+		</div>
+	</div>
+}
+
+func tagClass(active bool) string {
+	if active {
+		return "tag-chip active"
+	}
+	return "tag-chip"
+}
+
+templ TasksInbox(tasks []OpenTaskItem) {
+	<div class="tasks-inbox">
+		<header class="content-header">
+			<h2>Open tasks</h2>
+			<p class="muted">Aggregated from `- [ ]` checkboxes across your vault · NotePlan-style inbox</p>
+		</header>
+		if len(tasks) == 0 {
+			<p class="muted empty-hint">No open tasks. Add `- [ ]` items in any note.</p>
+		} else {
+			<ul class="task-inbox-list">
+				for _, task := range tasks {
+					<li>
+						<a href={ templ.SafeURL("/notes/" + task.Path) } hx-get={ "/notes/" + task.Path } hx-target="#main" hx-push-url="true">
+							<span class="task-check">☐</span>
+							<span class="task-text">{ task.Text }</span>
+							if task.Schedule != "" {
+								<span class="task-schedule">{ task.Schedule }</span>
+							}
+							<small class="task-source">{ task.Path }</small>
+						</a>
+					</li>
+				}
+			</ul>
+		}
+	</div>
+}
+
+templ VaultFolderList(sections []FolderSection) {
+	<div class="folder-tree" x-data="vaultItemList()">
+		for _, section := range sections {
+			<div class="folder-section">
+				if section.Name != "" {
+					<div class="folder-label">{ section.Name }</div>
+				}
+				<ul class="item-list">
+					for _, item := range section.Items {
+						<li class="item-row" data-kind={ item.Kind } data-path={ item.Path } @contextmenu.prevent="openMenu($event, $el)">
+							if item.Kind == "note" {
+								<a
+									href={ templ.SafeURL("/notes/" + item.Path) }
+									class={ itemClass(item.Active) }
+									hx-get={ "/notes/" + item.Path }
+									hx-target="#main"
+									hx-push-url="true"
+								>
+									<span class="item-icon">📄</span>
+									<span class="item-text">
+										<span class="item-title">{ item.Title }</span>
+										<small class="item-sub">{ item.Subtitle }</small>
+									</span>
+								</a>
+							} else {
+								<a
+									href={ templ.SafeURL("/databases/" + item.Path) }
+									class={ itemClass(item.Active) }
+									hx-get={ "/databases/" + item.Path }
+									hx-target="#main"
+									hx-push-url="true"
+								>
+									<span class="item-icon">🗃</span>
+									<span class="item-text">
+										<span class="item-title">{ item.Title }</span>
+										<small class="item-sub">{ item.Subtitle }</small>
+									</span>
+								</a>
+							}
+							<button type="button" class="item-menu-btn" title="Open in Finder" @click.stop="revealItem($el.closest('.item-row'))">↗</button>
+						</li>
+					}
+				</ul>
+			</div>
+		}
+		<div class="item-context-menu" x-show="menu.open" x-cloak :style="menuStyle()" @click.outside="menu.open=false">
+			<button type="button" @click="revealItem(menu.row); menu.open=false">Open in Finder</button>
+		</div>
+	</div>
+}
+
+templ VaultItemList(items []VaultItem) {
+	<ul class="item-list" x-data="vaultItemList()">
+		for _, item := range items {
+			<li class="item-row" data-kind={ item.Kind } data-path={ item.Path } @contextmenu.prevent="openMenu($event, $el)">
+				if item.Kind == "note" {
+					<a
+						href={ templ.SafeURL("/notes/" + item.Path) }
+						class={ itemClass(item.Active) }
+						hx-get={ "/notes/" + item.Path }
+						hx-target="#main"
+						hx-push-url="true"
+					>
+						<span class="item-icon">📄</span>
+						<span class="item-text">
+							<span class="item-title">{ item.Title }</span>
+							<small class="item-sub">{ item.Subtitle }</small>
+						</span>
+					</a>
+				} else {
+					<a
+						href={ templ.SafeURL("/databases/" + item.Path) }
+						class={ itemClass(item.Active) }
+						hx-get={ "/databases/" + item.Path }
+						hx-target="#main"
+						hx-push-url="true"
+					>
+						<span class="item-icon">🗃</span>
+						<span class="item-text">
+							<span class="item-title">{ item.Title }</span>
+							<small class="item-sub">{ item.Subtitle }</small>
+						</span>
+					</a>
+				}
+				<button type="button" class="item-menu-btn" title="Open in Finder" @click.stop="revealItem($el.closest('.item-row'))">↗</button>
+			</li>
+		}
+		<div class="item-context-menu" x-show="menu.open" x-cloak :style="menuStyle()" @click.outside="menu.open=false">
+			<button type="button" @click="revealItem(menu.row); menu.open=false">Open in Finder</button>
+		</div>
+	</ul>
+}
+
+func itemClass(active bool) string {
+	if active {
+		return "active"
+	}
+	return ""
+}
+
+templ SearchResults(results []SearchResult) {
+	<ul class="search-results">
+		for _, r := range results {
+			<li>
+				if r.Type == "note" {
+					<a href={ templ.SafeURL("/notes/" + r.Path) } hx-get={ "/notes/" + r.Path } hx-target="#main" hx-push-url="true">
+						<strong>{ r.Title }</strong>
+						<small>{ r.Snippet }</small>
+					</a>
+				} else {
+					<a href={ templ.SafeURL("/databases/" + trimCSV(r.Path)) } hx-get={ "/databases/" + trimCSV(r.Path) } hx-target="#main" hx-push-url="true">
+						<strong>{ r.Title }</strong>
+						<small>{ r.Snippet }</small>
+					</a>
+				}
+			</li>
+		}
+	</ul>
+}
+
+func trimCSV(p string) string {
+	if len(p) > 4 && p[len(p)-4:] == ".csv" {
+		return p[:len(p)-4]
+	}
+	return p
+}
+
+templ Welcome() {
+	<div class="empty-state notion-home">
+		<div class="notion-cover"></div>
+		<h2>Welcome to mindbase</h2>
+		<p>Local-first · Notion-like · Claude-powered</p>
+		<div class="feature-grid">
+			<div class="feature-card">
+				<h3>Calendar notes</h3>
+				<p>Daily & weekly journal pages — <a href="/journal/today">open today</a></p>
+			</div>
+			<div class="feature-card">
+				<h3>Tasks & tags</h3>
+				<p><code>- [ ]</code> tasks, <code>#tags</code>, <code>{ "@" }mentions</code>, backlinks</p>
+			</div>
+			<div class="feature-card">
+				<h3>Import</h3>
+				<p>Pull pages from <strong>Notion</strong> as Markdown</p>
+			</div>
+			<div class="feature-card">
+				<h3>Ask Claude</h3>
+				<p>AI assistant with <strong>Headroom</strong> + <strong>RTK</strong> compression</p>
+			</div>
+		</div>
+		<p class="muted"><a href="/connectors" hx-get="/connectors" hx-target="#main" hx-push-url="true">Open Connectors →</a></p>
+	</div>
+}
+
+templ MarkdownDocumentEditor(kind, path, title, content string, note *NotePage) {
+	<div
+		class="note-view notion-page"
+		x-data="markdownDocumentEditor()"
+		data-document-kind={ kind }
+		data-document-path={ path }
+	>
+		<header class="content-header notion-header">
+			<div class="page-breadcrumb">
+				<a href="/" hx-get="/" hx-target="#main" hx-push-url="true">Library</a>
+				<span>/</span>
+				<span>{ title }</span>
+				if kind == "database" {
+					<small class="muted"> · database</small>
+				}
+			</div>
+			<div class="header-actions">
+				if kind == "note" {
+					<button type="button" class="ai-trigger" @click="$dispatch('open-ai')" title="Ask Claude">✦ AI</button>
+				}
+				<div class="mode-toggle">
+					<button type="button" :class="{ active: mode==='edit' }" @click="mode='edit'">Edit</button>
+					<button type="button" :class="{ active: mode==='split' }" @click="mode='split'">Split</button>
+					<button type="button" :class="{ active: mode==='preview' }" @click="mode='preview'; renderPreview()">Preview</button>
+				</div>
+				<span class="save-status muted" x-text="saveStatus" x-show="saveStatus"></span>
+				<button type="button" class="primary" @click="save(true)">Save</button>
+			</div>
+		</header>
+		<div class="notion-title-bar">
+			<h1 class="page-title">{ title }</h1>
+			if note != nil && (note.JournalPrev != "" || note.JournalNext != "") {
+				<div class="journal-day-nav">
+					if note.JournalPrev != "" {
+						<a href={ templ.SafeURL("/journal/" + note.JournalPrev) } hx-get={ "/journal/" + note.JournalPrev } hx-target="#main" hx-push-url="true">← { note.JournalPrev }</a>
+					}
+					if note.JournalNext != "" {
+						<a href={ templ.SafeURL("/journal/" + note.JournalNext) } hx-get={ "/journal/" + note.JournalNext } hx-target="#main" hx-push-url="true">{ note.JournalNext } →</a>
+					}
+				</div>
+			}
+		</div>
+		if note != nil {
+			@NoteMetaPanel(*note)
+		}
+		<div class="editor-pane" :class="'mode-' + mode">
+			<div class="editor-wrap rich-editor-wrap" x-show="mode !== 'preview'">
+				<div class="slash-menu notion-slash" x-show="showSlash" x-cloak @click.outside="closeSlash()">
+					<div class="slash-menu-header">Commands</div>
+					<template x-for="(cmd, i) in filteredSlashCommands()" :key="cmd.id">
+						<button
+							type="button"
+							class="slash-cmd"
+							:class="{ active: slashIndex === i }"
+							@click="runSlashCommand(cmd)"
+						>
+							<span class="slash-icon" x-text="cmd.icon"></span>
+							<span class="slash-label">
+								<strong x-text="cmd.label"></strong>
+								<small x-text="cmd.hint"></small>
+							</span>
+						</button>
+					</template>
+					<p class="slash-empty muted" x-show="filteredSlashCommands().length === 0">No matching commands</p>
+				</div>
+				<p class="editor-hint muted">Type <kbd>/</kbd> { "for" } commands · <kbd>{ "#" }</kbd> + space { "for" } heading · saves as markdown</p>
+				<textarea id="editor-source" class="editor-source-hidden">{ content }</textarea>
+				<div id="rich-editor"></div>
+			</div>
+			<div id="preview" class="markdown-preview notion-preview" x-show="mode !== 'edit'" x-html="previewHTML"></div>
+		</div>
+		if note != nil {
+			<section class="attachments-panel">
+				<h3>Attachments</h3>
+				<form hx-post={ "/attachments/" + note.Path } hx-encoding="multipart/form-data" hx-target="#attachment-list" hx-swap="innerHTML">
+					<input type="file" name="file"/>
+					<button type="submit">Upload</button>
+				</form>
+				<div id="attachment-list">
+					@AttachmentList(note.Attachments)
+				</div>
+				if len(note.Excalidraw) > 0 {
+					<h4>Excalidraw files</h4>
+					<ul class="excalidraw-files">
+						for _, f := range note.Excalidraw {
+							<li>
+								<button type="button" data-excalidraw-file={ f } @click={ "loadExcalidrawFile('" + note.Path + "','" + f + "')" }>{ f }</button>
+							</li>
+						}
+					</ul>
+				}
+			</section>
+		}
+	</div>
+}
+
+templ NoteMetaPanel(note NotePage) {
+	<section class="note-meta-panel">
+		if len(note.Tags) > 0 {
+			<div class="meta-block">
+				<h4>Tags</h4>
+				<div class="tag-chips inline">
+					for _, tag := range note.Tags {
+						<a href={ templ.SafeURL("/tags/" + tag) } class="tag-chip" hx-get={ "/tags/" + tag } hx-target="#main" hx-push-url="true">#{ tag }</a>
+					}
+				</div>
+			</div>
+		}
+		if len(note.Backlinks) > 0 {
+			<div class="meta-block">
+				<h4>Backlinks</h4>
+				<ul class="backlink-list">
+					for _, bl := range note.Backlinks {
+						<li>
+							<a href={ templ.SafeURL("/notes/" + bl.Path) } hx-get={ "/notes/" + bl.Path } hx-target="#main" hx-push-url="true">{ bl.Title }</a>
+							if bl.Context != "" {
+								<small>{ bl.Context }</small>
+							}
+						</li>
+					}
+				</ul>
+			</div>
+		}
+		if len(note.Tasks) > 0 {
+			<div class="meta-block">
+				<h4>Tasks in this note</h4>
+				<ul class="note-task-list">
+					for _, task := range note.Tasks {
+						<li class={ taskDoneClass(task.Done) }>
+							<span>{ taskCheckbox(task.Done) }</span>
+							<span>{ task.Text }</span>
+							if task.Schedule != "" {
+								<small class="task-schedule">{ task.Schedule }</small>
+							}
+						</li>
+					}
+				</ul>
+			</div>
+		}
+	</section>
+}
+
+func taskDoneClass(done bool) string {
+	if done {
+		return "done"
+	}
+	return ""
+}
+
+func taskCheckbox(done bool) string {
+	if done {
+		return "☑"
+	}
+	return "☐"
+}
+
+templ NoteEditor(note NotePage) {
+	@MarkdownDocumentEditor("note", note.Path, note.Title, note.Content, &note)
+}
+
+templ DatabaseEditor(db DatabasePage) {
+	@MarkdownDocumentEditor("database", db.Path, db.Title, db.Content, nil)
+}
+
+templ AttachmentList(items []AttachmentItem) {
+	<ul>
+		for _, a := range items {
+			<li>
+				<a href={ templ.SafeURL(a.URL) } target="_blank">{ a.Name }</a>
+			</li>
+		}
+	</ul>
+}
+
+templ SyncStatus(lastSync string, pending int) {
+	<div class="sync-badge" title="Auto-sync polling">
+		Sync: { lastSync } ({ formatInt(pending) } changes)
+	</div>
+}
+
+templ ConnectorsPanel(status connectors.Status) {
+	<div class="connectors-view" x-data="connectorsPanel()" x-init="init()">
+		<header class="content-header">
+			<h2>Connectors</h2>
+			<p class="muted">Direct Notion + Google Drive · cached locally in your vault</p>
+			<button type="button" class="primary" @click="syncAll()" :disabled="loading">Sync all now</button>
+		</header>
+		<section class="cache-stats">
+			<p><strong>Local cache</strong> — { formatInt(status.Notion.CachedPages) } Notion pages · { formatInt(status.GDrive.CachedFiles) } Drive files</p>
+			if status.Config.AutoSync {
+				<p class="muted">Auto-sync every { formatInt(status.Config.SyncIntervalMin) } min when credentials are set</p>
+			}
+		</section>
+		<div class="connector-grid">
+			<section class="connector-card">
+				<h3>Notion <span class={ badgeClass(status.Notion.Connected) }>{ connLabel(status.Notion.Connected) }</span></h3>
+				<p>Pulls pages into <code>notes/{ status.Notion.ImportDir }/</code> with incremental cache</p>
+				if !status.Notion.LastImport.IsZero() {
+					<p class="muted">Last sync: { status.Notion.LastImport.Format("Jan 2, 15:04") }</p>
+				}
+				<button type="button" @click="importNotion()" :disabled="loading">Sync Notion</button>
+			</section>
+			<section class="connector-card">
+				<h3>Google Drive <span class={ badgeClass(status.GDrive.Connected) }>{ connLabel(status.GDrive.Connected) }</span></h3>
+				<p>Two-way sync — push local edits, pull remote updates into cache</p>
+				if status.GDrive.FolderID != "" {
+					<p class="muted">Folder: { status.GDrive.FolderID }</p>
+				}
+				if !status.GDrive.LastSync.IsZero() {
+					<p class="muted">Last sync: { status.GDrive.LastSync.Format("Jan 2, 15:04") }</p>
+				}
+				<button type="button" @click="syncGDrive()" :disabled="loading">Sync Drive</button>
+			</section>
+			<section class="connector-card ai-card">
+				<h3>Claude AI <span class={ badgeClass(status.AI.ClaudeReady) }>{ connLabel(status.AI.ClaudeReady) }</span></h3>
+				<p>Model: <code>{ status.AI.Model }</code></p>
+				<p>Headroom: <span class={ badgeClass(status.AI.HeadroomReady) }>{ headroomLabel(status.AI.HeadroomReady) }</span> at <code>{ status.AI.HeadroomURL }</code></p>
+				<p>RTK compression: { onOff(status.AI.RTKEnabled) }</p>
+				<button type="button" @click="$dispatch('open-ai')">Open AI assistant</button>
+			</section>
+		</div>
+		<div class="connector-log" x-show="message" x-text="message"></div>
+		<section class="connector-credentials">
+			<h3>Credentials</h3>
+			<p class="muted">Stored locally in <code>vault/.mindbase/secrets.json</code> (0600). Env vars still override.</p>
+			<div class="cred-grid">
+				<div class="cred-card">
+					<h4>Notion</h4>
+					<p class="muted" x-show="creds.notion_token_set">Token: <span x-text="creds.notion_token_preview"></span></p>
+					<label>Integration token<input type="password" x-model="forms.notion_token" placeholder="secret_…"></label>
+					<div class="cred-actions">
+						<button type="button" @click="saveCredentials('notion')">Save token</button>
+						<button type="button" class="secondary" @click="startNotionOAuth()" :disabled="!creds.notion_oauth_configured">Sign in with Notion</button>
+					</div>
+					<details class="oauth-details">
+						<summary>Notion OAuth app (optional SSO)</summary>
+						<label>Client ID<input type="text" x-model="forms.notion_oauth_client_id"></label>
+						<label>Client secret<input type="password" x-model="forms.notion_oauth_client_secret"></label>
+						<button type="button" @click="saveNotionOAuthApp()">Save OAuth app</button>
+					</details>
+				</div>
+				<div class="cred-card">
+					<h4>Google Drive</h4>
+					<p class="muted" x-show="creds.gdrive_connected" x-text="creds.gdrive_token_preview"></p>
+					<div class="cred-actions">
+						<button type="button" class="primary" @click="startGDriveOAuth()" :disabled="!creds.google_oauth_configured">Sign in with Google</button>
+					</div>
+					<details class="oauth-details">
+						<summary>OAuth client JSON (for Sign in with Google)</summary>
+						<label>Client JSON<textarea x-model="forms.google_oauth_client_json" rows="4" placeholder='{"web":{"client_id":"…"}}'></textarea></label>
+						<button type="button" @click="saveGoogleOAuthClient()">Save client JSON</button>
+					</details>
+					<details class="oauth-details">
+						<summary>Service account JSON (alternative)</summary>
+						<label>Credentials<textarea x-model="forms.gdrive_credentials_json" rows="4"></textarea></label>
+						<button type="button" @click="saveGDriveServiceAccount()">Save service account</button>
+					</details>
+				</div>
+				<div class="cred-card">
+					<h4>Claude</h4>
+					<p class="muted" x-show="creds.anthropic_key_set">Key: <span x-text="creds.anthropic_key_preview"></span></p>
+					<label>API key<input type="password" x-model="forms.anthropic_api_key" placeholder="sk-ant-…"></label>
+					<button type="button" @click="saveCredentials('anthropic')">Save key</button>
+				</div>
+			</div>
+		</section>
+	</div>
+}
+
+func badgeClass(ok bool) string {
+	if ok {
+		return "badge ok"
+	}
+	return "badge warn"
+}
+
+func connLabel(ok bool) string {
+	if ok {
+		return "ready"
+	}
+	return "needs config"
+}
+
+func headroomLabel(ok bool) string {
+	if ok {
+		return "online"
+	}
+	return "offline"
+}
+
+func onOff(v bool) string {
+	if v {
+		return "on"
+	}
+	return "off"
+}
+
+templ SearchPartial(results []SearchResult) {
+	@SearchResults(results)
+}

@@ -1,0 +1,5 @@
+id,title,status,priority,_page
+1,Launch MVP,done,high,[[page:welcome]]
+2,Mobile app,in-progress,high,projects
+3,Sync support,planned,medium,
+4,Plugin system,planned,low,

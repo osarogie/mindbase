@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/osarogie/mindbase/internal/markdown"
 	"github.com/osarogie/mindbase/internal/vault"
 )
 
@@ -143,7 +144,7 @@ func FindBacklinks(v *vault.Vault, targetPath string) ([]Backlink, error) {
 		}
 		links = append(links, Backlink{
 			Path:    rel,
-			Title:   titleFromPath(rel),
+			Title:   markdown.TitleFromContent(content, markdown.TitleFromPath(rel)),
 			Context: backlinkContext(content, keys),
 		})
 		return nil
@@ -272,8 +273,4 @@ func backlinkContext(content string, keys map[string]bool) string {
 		}
 	}
 	return ""
-}
-
-func titleFromPath(path string) string {
-	return strings.TrimSuffix(filepath.Base(path), ".md")
 }

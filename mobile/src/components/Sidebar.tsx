@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Platform,
   Pressable,
@@ -10,13 +11,18 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useState, memo, useCallback } from 'react';
 import { useTopSpacerHeight, useEffectiveBottomInset } from '../hooks/useSafeTopPadding';
 import { colors, radii, softShadow, spacing, typography } from '../theme';
 import { formatModified } from '../utils/noteContent';
+import { iconForDocumentKind } from '../utils/documentIcons';
+import { fileInfoFromVaultItem } from '../utils/fileInfo';
 import { ActionChips } from './ActionChips';
 import { ErrorBanner } from './ErrorBanner';
+import { FileInfoPanel } from './FileInfoPanel';
+import { OverflowMenuButton } from './OverflowMenuButton';
+import { useVault } from '../context/VaultContext';
 import type { VaultItem } from 'mindbase';
-import { memo, useCallback } from 'react';
 
 interface Props {
   vaultName: string;
@@ -29,6 +35,8 @@ interface Props {
   loading?: boolean;
   showSearch?: boolean;
   searchAutoFocus?: boolean;
+  useNativeHeader?: boolean;
+  listVariant?: 'library' | 'search';
   onQueryChange: (value: string) => void;
   onSelect: (item: VaultItem) => void;
   onNewPage: () => void;
@@ -40,20 +48,34 @@ const VaultRow = memo(function VaultRow({
   item,
   active,
   onSelect,
+  onShowInfo,
 }: {
   item: VaultItem;
   active: boolean;
   onSelect: (item: VaultItem) => void;
+  onShowInfo: (item: VaultItem) => void;
 }) {
+  const openContextMenu = () => {
+    Alert.alert(item.title, undefined, [
+      { text: 'Open', onPress: () => onSelect(item) },
+      { text: 'File info', onPress: () => onShowInfo(item) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  const rowMenuActions = [{ label: 'File info', onPress: () => onShowInfo(item) }];
+
   return (
     <Pressable
       onPress={() => onSelect(item)}
+      onLongPress={openContextMenu}
+      delayLongPress={320}
       style={({ pressed }) => [styles.row, active && styles.rowActive, pressed && styles.rowPressed]}
     >
       {active ? <View style={styles.rowAccent} /> : null}
       <View style={[styles.iconBadge, active && styles.iconBadgeActive]}>
         <Ionicons
-          name={item.kind === 'database' ? 'grid-outline' : 'document-text-outline'}
+          name={iconForDocumentKind(item.kind)}
           size={16}
           color={active ? colors.accent : colors.textSecondary}
         />
@@ -66,6 +88,11 @@ const VaultRow = memo(function VaultRow({
           {item.folder || item.subtitle || formatModified(item.modified)}
         </Text>
       </View>
+      <OverflowMenuButton
+        title={item.title}
+        actions={rowMenuActions}
+        accessibilityLabel={`More options for ${item.title}`}
+      />
       <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
     </Pressable>
   );
@@ -82,6 +109,8 @@ export function Sidebar({
   loading = false,
   showSearch = true,
   searchAutoFocus = false,
+  useNativeHeader = false,
+  listVariant = 'library',
   onQueryChange,
   onSelect,
   onNewPage,
@@ -90,56 +119,106 @@ export function Sidebar({
 }: Props) {
   const topInset = useTopSpacerHeight();
   const bottomInset = useEffectiveBottomInset();
+  const { vaultPath } = useVault();
+  const [fileInfoItem, setFileInfoItem] = useState<VaultItem | null>(null);
+
+  const showFileInfo = useCallback((item: VaultItem) => {
+    setFileInfoItem(item);
+  }, []);
 
   const renderItem = useCallback(
     ({ item }: { item: VaultItem }) => (
-      <VaultRow item={item} active={item.path === selectedPath} onSelect={onSelect} />
+      <VaultRow
+        item={item}
+        active={item.path === selectedPath}
+        onSelect={onSelect}
+        onShowInfo={showFileInfo}
+      />
     ),
-    [onSelect, selectedPath],
+    [onSelect, selectedPath, showFileInfo],
   );
+
+  const isSearchList = listVariant === 'search';
+  const trimmedQuery = query.trim();
 
   const listHeader = (
     <View>
-      <View style={[styles.topInsetSpacer, { height: topInset }]} />
+      {!useNativeHeader ? <View style={[styles.topInsetSpacer, { height: topInset }]} /> : null}
       {error ? <ErrorBanner message={error} onDismiss={onDismissError ?? (() => {})} /> : null}
 
-      <View style={styles.headerCard}>
-        <View style={styles.brandRow}>
-          <View style={styles.logo}>
-            <Ionicons name="library-outline" size={20} color={colors.accent} />
+      {!isSearchList ? (
+        <View style={styles.headerCard}>
+          <View style={styles.brandRow}>
+            <View style={styles.logo}>
+              <Ionicons name="library-outline" size={20} color={colors.accent} />
+            </View>
+            <View style={styles.brandText}>
+              <Text style={styles.vaultLabel}>Vault</Text>
+              <Text style={styles.vaultName} numberOfLines={1}>
+                {vaultName || 'Mindbase'}
+              </Text>
+              <Text style={styles.meta}>{items.length} pages</Text>
+            </View>
           </View>
-          <View style={styles.brandText}>
-            <Text style={styles.vaultLabel}>Vault</Text>
-            <Text style={styles.vaultName} numberOfLines={1}>
-              {vaultName || 'Mindbase'}
-            </Text>
-            <Text style={styles.meta}>{items.length} pages</Text>
-          </View>
+
+          <ActionChips onNewPage={onNewPage} onToday={onToday} onRefresh={onRefresh} />
+
+          {showSearch ? (
+            <View style={styles.searchWrap}>
+              <Ionicons name="search" size={17} color={colors.textMuted} />
+              <TextInput
+                value={query}
+                onChangeText={onQueryChange}
+                placeholder="Search pages"
+                placeholderTextColor={colors.textMuted}
+                style={styles.search}
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoFocus={searchAutoFocus}
+                clearButtonMode="while-editing"
+              />
+            </View>
+          ) : null}
         </View>
+      ) : null}
 
-        <ActionChips onNewPage={onNewPage} onToday={onToday} onRefresh={onRefresh} />
+      {isSearchList && trimmedQuery ? (
+        <View style={styles.listSectionHeader}>
+          <Text style={styles.listSectionTitle}>
+            {items.length === 1 ? '1 result' : `${items.length} results`}
+          </Text>
+        </View>
+      ) : !isSearchList ? (
+        <View style={styles.listSectionHeader}>
+          <Text style={styles.listSectionTitle}>Pages</Text>
+        </View>
+      ) : null}
+    </View>
+  );
 
-        {showSearch ? (
-          <View style={styles.searchWrap}>
-            <Ionicons name="search" size={17} color={colors.textMuted} />
-            <TextInput
-              value={query}
-              onChangeText={onQueryChange}
-              placeholder="Search pages"
-              placeholderTextColor={colors.textMuted}
-              style={styles.search}
-              autoCapitalize="none"
-              autoCorrect={false}
-              autoFocus={searchAutoFocus}
-              clearButtonMode="while-editing"
-            />
-          </View>
-        ) : null}
+  const emptyComponent = isSearchList ? (
+    <View style={styles.emptyWrap}>
+      <View style={styles.emptyIcon}>
+        <Ionicons
+          name={trimmedQuery ? 'search-outline' : 'sparkles-outline'}
+          size={24}
+          color={colors.accent}
+        />
       </View>
-
-      <View style={styles.listSectionHeader}>
-        <Text style={styles.listSectionTitle}>Pages</Text>
+      <Text style={styles.emptyTitle}>{trimmedQuery ? 'No results' : 'Search your vault'}</Text>
+      <Text style={styles.empty}>
+        {trimmedQuery
+          ? `Nothing matched "${trimmedQuery}". Try different keywords.`
+          : 'Find notes, pages, and files across your vault.'}
+      </Text>
+    </View>
+  ) : (
+    <View style={styles.emptyWrap}>
+      <View style={styles.emptyIcon}>
+        <Ionicons name="document-text-outline" size={24} color={colors.accent} />
       </View>
+      <Text style={styles.emptyTitle}>No pages yet</Text>
+      <Text style={styles.empty}>Create your first page or open today&apos;s note.</Text>
     </View>
   );
 
@@ -154,7 +233,7 @@ export function Sidebar({
         maxToRenderPerBatch={12}
         windowSize={8}
         removeClippedSubviews={Platform.OS === 'android'}
-        contentInsetAdjustmentBehavior="never"
+        contentInsetAdjustmentBehavior={useNativeHeader ? 'automatic' : 'never'}
         automaticallyAdjustsScrollIndicatorInsets
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
@@ -167,21 +246,18 @@ export function Sidebar({
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />
         }
         ListHeaderComponent={listHeader}
-        ListEmptyComponent={
-          <View style={styles.emptyWrap}>
-            <View style={styles.emptyIcon}>
-              <Ionicons name="document-text-outline" size={24} color={colors.accent} />
-            </View>
-            <Text style={styles.emptyTitle}>No pages yet</Text>
-            <Text style={styles.empty}>Create your first page or open Today&apos;s journal.</Text>
-          </View>
-        }
+        ListEmptyComponent={emptyComponent}
       />
       {loading ? (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color={colors.accent} />
         </View>
       ) : null}
+      <FileInfoPanel
+        visible={fileInfoItem != null}
+        details={fileInfoItem ? fileInfoFromVaultItem(fileInfoItem, vaultPath) : null}
+        onClose={() => setFileInfoItem(null)}
+      />
     </View>
   );
 }
@@ -200,11 +276,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg,
   },
   headerCard: {
-    marginHorizontal: spacing.screen,
-    marginTop: spacing.md,
-    marginBottom: spacing.lg,
-    padding: spacing.xl,
-    gap: spacing.lg,
+    marginBottom: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    gap: spacing.md,
     backgroundColor: colors.surfaceElevated,
     borderRadius: radii.lg,
     borderWidth: StyleSheet.hairlineWidth,
@@ -261,9 +336,8 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
   },
   listSectionHeader: {
-    paddingHorizontal: spacing.screen,
     paddingTop: spacing.xs,
-    paddingBottom: spacing.md,
+    paddingBottom: spacing.sm,
   },
   listSectionTitle: {
     ...typography.micro,
@@ -273,7 +347,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.screen,
   },
   listContentEmpty: {
-    flexGrow: 1,
+    // flexGrow: 1,
     justifyContent: 'center',
   },
   row: {

@@ -1,6 +1,9 @@
 bin/
 tmp/
+dist/
 web/dist/
+internal/webui/dist/
+editor-ui/dist/
 node_modules/
 web/node_modules/
 mobile/node_modules/
@@ -16,5 +19,5 @@ package-lock.json
 web/package-lock.json
 mobile/package-lock.json
 .cursor/
-vault/.mindbase/secrets.json
+vault/
 /.expo

@@ -1,31 +1,28 @@
-import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { usePathname, useRouter, useFocusEffect } from 'expo-router';
+import { useMemo, useState, useCallback } from 'react';
 import { Sidebar } from '../components/Sidebar';
+import { useEditorTabs } from '../context/EditorTabsContext';
 import { useVault } from '../context/VaultContext';
-import { notePathToSegments } from '../navigation/notePath';
+import { openEditor } from '../navigation/editorRoute';
 import type { VaultItem } from 'mindbase';
 
-interface Props {
-  mode: 'library' | 'search';
-}
-
-export function VaultListScreen({ mode }: Props) {
+export function VaultListScreen() {
   const router = useRouter();
-  const { vaultName, items, refreshing, loading, ready, error, clearError, refresh, runSearch, createPage, openToday } =
+  const pathname = usePathname();
+  const { openTab } = useEditorTabs();
+  const { vaultName, items, refreshing, loading, ready, error, clearError, refresh, createPage, openToday } =
     useVault();
   const [query, setQuery] = useState('');
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (mode !== 'search' || !ready) return;
-    const timer = setTimeout(() => {
-      void runSearch(query);
-    }, 350);
-    return () => clearTimeout(timer);
-  }, [mode, query, ready, runSearch]);
+  useFocusEffect(
+    useCallback(() => {
+      if (!ready) return;
+      void refresh(true);
+    }, [ready, refresh]),
+  );
 
   const filteredItems = useMemo(() => {
-    if (mode === 'search') return items;
     const q = query.trim().toLowerCase();
     if (!q) return items;
     return items.filter(
@@ -34,16 +31,12 @@ export function VaultListScreen({ mode }: Props) {
         item.path.toLowerCase().includes(q) ||
         item.subtitle.toLowerCase().includes(q),
     );
-  }, [items, mode, query]);
+  }, [items, query]);
 
   const openItem = (item: VaultItem) => {
-    if (item.kind !== 'note') return;
     setSelectedPath(item.path);
-    const base = mode === 'search' ? '/(tabs)/(search)/note/[...path]' : '/(tabs)/(library)/note/[...path]';
-    router.push({
-      pathname: base,
-      params: { path: notePathToSegments(item.path) },
-    });
+    openTab(item.kind, item.path, item.title);
+    openEditor(router, pathname);
   };
 
   const handleNewPage = async () => {
@@ -84,11 +77,10 @@ export function VaultListScreen({ mode }: Props) {
       loading={loading}
       error={error}
       onDismissError={clearError}
-      showSearch={mode === 'search' || mode === 'library'}
-      searchAutoFocus={mode === 'search'}
+      showSearch
       onQueryChange={(value) => {
         setQuery(value);
-        if (mode !== 'search' && !value.trim()) void refresh(true);
+        if (!value.trim()) void refresh(true);
       }}
       onSelect={openItem}
       onNewPage={() => void handleNewPage()}

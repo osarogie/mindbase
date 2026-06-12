@@ -23,6 +23,12 @@ struct MindbaseApp: App {
                 }
                 .keyboardShortcut("t", modifiers: [.command, .shift])
             }
+            CommandGroup(after: .sidebar) {
+                Button("Command Palette…") {
+                    appModel.commandPalettePresented = true
+                }
+                .keyboardShortcut("k", modifiers: [.command])
+            }
             CommandGroup(after: .saveItem) {
                 Button("Save") {
                     Task { await appModel.saveCurrent() }

@@ -1,11 +1,17 @@
 package native
 
 import (
+	"context"
+	"encoding/base64"
+	"encoding/csv"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/osarogie/mindbase/internal/ai"
+	"github.com/osarogie/mindbase/internal/connectors"
 	"github.com/osarogie/mindbase/internal/database"
 	"github.com/osarogie/mindbase/internal/editor"
 	"github.com/osarogie/mindbase/internal/journal"
@@ -15,6 +21,7 @@ import (
 	"github.com/osarogie/mindbase/internal/snapshots"
 	"github.com/osarogie/mindbase/internal/vault"
 	"github.com/osarogie/mindbase/internal/vaultgit"
+	"github.com/osarogie/mindbase/internal/vaultmedia"
 	"github.com/osarogie/mindbase/internal/vaultparse"
 )
 
@@ -72,6 +79,15 @@ type JournalDayLink struct {
 type TagCount struct {
 	Tag   string `json:"tag"`
 	Count int    `json:"count"`
+}
+
+type OpenTaskEntry struct {
+	Path      string   `json:"path"`
+	NoteTitle string   `json:"note_title"`
+	Line      int      `json:"line"`
+	Text      string   `json:"text"`
+	Schedule  string   `json:"schedule,omitempty"`
+	Tags      []string `json:"tags,omitempty"`
 }
 
 type VaultInfo struct {
@@ -152,7 +168,8 @@ func (e *Engine) Snapshot() (VaultSnapshot, error) {
 		})
 	}
 
-	items := buildVaultItems(e.vault, notesOut, dbsOut)
+	media, _ := vaultmedia.List(e.vault)
+	items := buildVaultItems(e.vault, notesOut, dbsOut, media)
 	sections := buildFolderSections(items)
 	jDays := journalDayLinks()
 	tags, _ := vaultparse.ListTags(e.vault)
@@ -193,6 +210,17 @@ func (e *Engine) SaveNote(path, content string) (*Note, error) {
 	return &Note{Path: n.Path, Title: n.Title, Content: n.Content}, nil
 }
 
+func (e *Engine) DeleteVaultItem(kind, path string) error {
+	switch kind {
+	case "database":
+		return e.databases.Delete(path)
+	case "note", "image", "pdf", "epub", "csv", "":
+		return e.notes.Delete(path)
+	default:
+		return fmt.Errorf("unsupported kind %q", kind)
+	}
+}
+
 func (e *Engine) GetDatabaseMarkdown(name string) (string, error) {
 	return database.GetMarkdown(e.databases, name)
 }
@@ -204,6 +232,39 @@ func (e *Engine) SaveDatabaseMarkdown(name, content string) error {
 
 func (e *Engine) Search(query string) ([]search.Result, error) {
 	return e.search.Query(query)
+}
+
+func (e *Engine) ListOpenTasks() ([]OpenTaskEntry, error) {
+	tasks, err := vaultparse.ListOpenTasks(e.vault)
+	if err != nil {
+		return nil, err
+	}
+	titleByPath := map[string]string{}
+	out := make([]OpenTaskEntry, 0, len(tasks))
+	for _, task := range tasks {
+		title, ok := titleByPath[task.Path]
+		if !ok {
+			note, err := e.notes.Get(task.Path)
+			if err != nil {
+				title = markdown.TitleFromPath(task.Path)
+			} else {
+				title = note.Title
+			}
+			titleByPath[task.Path] = title
+		}
+		out = append(out, OpenTaskEntry{
+			Path:      task.Path,
+			NoteTitle: title,
+			Line:      task.Line,
+			Text:      task.Text,
+			Schedule:  task.Schedule,
+			Tags:      task.Tags,
+		})
+	}
+	if out == nil {
+		out = []OpenTaskEntry{}
+	}
+	return out, nil
 }
 
 func (e *Engine) renderOpts(notePath string) markdown.RenderOptions {
@@ -327,8 +388,104 @@ func (e *Engine) EnsureWeeklyNote(date time.Time) (string, error) {
 	return path, nil
 }
 
-func buildVaultItems(v *vault.Vault, notes []NoteEntry, dbs []DatabaseEntry) []VaultItem {
-	items := make([]VaultItem, 0, len(notes)+len(dbs))
+type CSVTable struct {
+	Path    string     `json:"path"`
+	Headers []string   `json:"headers"`
+	Rows    [][]string `json:"rows"`
+}
+
+type FilePayload struct {
+	Path        string `json:"path"`
+	Mime        string `json:"mime"`
+	Base64      string `json:"base64"`
+	Size        int64  `json:"size"`
+}
+
+func (e *Engine) GetCSVTable(vaultPath string) (*CSVTable, error) {
+	if table, err := e.databases.Get(vaultPath); err == nil {
+		return &CSVTable{
+			Path:    table.Name,
+			Headers: table.Headers,
+			Rows:    table.Rows,
+		}, nil
+	}
+	full, err := e.vault.ResolveNotePath(vaultPath)
+	if err != nil {
+		return nil, err
+	}
+	if strings.ToLower(filepath.Ext(full)) != ".csv" {
+		return nil, fmt.Errorf("not a csv file")
+	}
+	return readCSVAbsolute(full, vaultPath)
+}
+
+func readCSVAbsolute(full, rel string) (*CSVTable, error) {
+	f, err := os.Open(full)
+	if err != nil {
+		return nil, fmt.Errorf("open csv: %w", err)
+	}
+	defer f.Close()
+
+	r := csv.NewReader(f)
+	records, err := r.ReadAll()
+	if err != nil {
+		return nil, fmt.Errorf("parse csv: %w", err)
+	}
+	rel = filepath.ToSlash(rel)
+	if len(records) == 0 {
+		return &CSVTable{Path: rel, Headers: []string{}, Rows: [][]string{}}, nil
+	}
+	return &CSVTable{Path: rel, Headers: records[0], Rows: records[1:]}, nil
+}
+
+func (e *Engine) ReadFilePayload(vaultPath string) (*FilePayload, error) {
+	full, err := e.vault.ResolveNotePath(vaultPath)
+	if err != nil {
+		return nil, err
+	}
+	data, err := os.ReadFile(full)
+	if err != nil {
+		return nil, err
+	}
+	ext := strings.ToLower(filepath.Ext(full))
+	mime := mimeForExt(ext)
+	return &FilePayload{
+		Path:   filepath.ToSlash(vaultPath),
+		Mime:   mime,
+		Base64: base64.StdEncoding.EncodeToString(data),
+		Size:   int64(len(data)),
+	}, nil
+}
+
+func mimeForExt(ext string) string {
+	switch ext {
+	case ".png":
+		return "image/png"
+	case ".jpg", ".jpeg":
+		return "image/jpeg"
+	case ".gif":
+		return "image/gif"
+	case ".webp":
+		return "image/webp"
+	case ".heic":
+		return "image/heic"
+	case ".heif":
+		return "image/heif"
+	case ".svg":
+		return "image/svg+xml"
+	case ".pdf":
+		return "application/pdf"
+	case ".epub":
+		return "application/epub+zip"
+	case ".csv":
+		return "text/csv"
+	default:
+		return "application/octet-stream"
+	}
+}
+
+func buildVaultItems(v *vault.Vault, notes []NoteEntry, dbs []DatabaseEntry, media []vaultmedia.Entry) []VaultItem {
+	items := make([]VaultItem, 0, len(notes)+len(dbs)+len(media))
 	for _, n := range notes {
 		full, _ := v.ResolveNotePath(n.Path)
 		folder := filepath.Dir(n.Path)
@@ -354,6 +511,15 @@ func buildVaultItems(v *vault.Vault, notes []NoteEntry, dbs []DatabaseEntry) []V
 		items = append(items, VaultItem{
 			ID: "db:" + d.Name, Kind: "database", Title: title, Subtitle: sub,
 			Path: d.Name, Folder: folder, FilePath: full, Modified: d.Modified,
+		})
+	}
+	for _, m := range media {
+		folder := m.Folder
+		items = append(items, VaultItem{
+			ID: string(m.Kind) + ":" + m.Path,
+			Kind: string(m.Kind), Title: m.Title,
+			Subtitle: vaultmedia.Subtitle(m.Kind, m.Size),
+			Path: m.Path, Folder: folder, FilePath: m.FilePath, Modified: m.Modified,
 		})
 	}
 	sortVaultItems(items)
@@ -421,8 +587,8 @@ func sortVaultItems(items []VaultItem) {
 func sortFolderNames(order []string) {
 	for i := 0; i < len(order); i++ {
 		for j := i + 1; j < len(order); j++ {
-			ai, aj := order[i] == "", order[j] == ""
-			if aj && !ai {
+			aEmpty, bEmpty := order[i] == "", order[j] == ""
+			if bEmpty && !aEmpty {
 				order[i], order[j] = order[j], order[i]
 				continue
 			}
@@ -431,4 +597,12 @@ func sortFolderNames(order []string) {
 			}
 		}
 	}
+}
+
+func (e *Engine) AIChat(ctx context.Context, req ai.ChatRequest) (*ai.ChatResponse, error) {
+	conn, err := connectors.NewService(e.vault)
+	if err != nil {
+		return nil, err
+	}
+	return conn.AIChat(ctx, req)
 }

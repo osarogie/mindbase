@@ -10,8 +10,8 @@ import (
 func TestBuildPageAndRoundtrip(t *testing.T) {
 	src := "# Hello\n\n- [ ] Task one\n\n**Bold** text"
 	page := BuildPage(src, markdown.RenderOptions{})
-	if !strings.Contains(page.HTML, "contenteditable") {
-		t.Fatal("expected contenteditable document")
+	if !strings.Contains(page.HTML, "lexical-root") {
+		t.Fatal("expected lexical editor document")
 	}
 	if !strings.Contains(page.HTML, "Hello") {
 		t.Fatal("expected rendered title")

@@ -58,9 +58,11 @@ func (h *Handlers) Mount(r chi.Router) {
 	r.Get("/", h.handleHome)
 	r.Get("/notes/*", h.handleNote)
 	r.Put("/notes/*", h.handleSaveNote)
+	r.Delete("/notes/*", h.handleDeleteNote)
 	r.Get("/databases", h.handleDatabasesHome)
 	r.Get("/databases/*", h.handleDatabase)
 	r.Put("/databases/*", h.handleSaveDatabase)
+	r.Delete("/databases/*", h.handleDeleteDatabase)
 	r.Get("/search", h.handleSearch)
 	r.Post("/attachments/*", h.handleUploadAttachment)
 	r.Get("/preview/*", h.handlePreview)
@@ -75,6 +77,7 @@ func (h *Handlers) Mount(r chi.Router) {
 	r.Get("/tasks", h.handleTasks)
 	r.Get("/tags/{tag}", h.handleTag)
 	r.Get("/connectors", h.handleConnectors)
+	r.Get("/settings", h.handleSettings)
 	r.Post("/reveal", h.handleReveal)
 }
 
@@ -182,6 +185,19 @@ func (h *Handlers) handleNote(w http.ResponseWriter, r *http.Request) {
 	_ = templates.Layout(data).Render(r.Context(), w)
 }
 
+func (h *Handlers) handleDeleteNote(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(chi.URLParam(r, "*"), "/")
+	if err := h.notes.Delete(path); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if r.Header.Get("HX-Request") == "true" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
 func (h *Handlers) handleSaveNote(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(chi.URLParam(r, "*"), "/")
 	content := r.FormValue("content")
@@ -238,6 +254,19 @@ func (h *Handlers) handleDatabase(w http.ResponseWriter, r *http.Request) {
 	data.Database = &dp
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = templates.Layout(data).Render(r.Context(), w)
+}
+
+func (h *Handlers) handleDeleteDatabase(w http.ResponseWriter, r *http.Request) {
+	name := strings.TrimPrefix(chi.URLParam(r, "*"), "/")
+	if err := h.databases.Delete(name); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if r.Header.Get("HX-Request") == "true" {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func (h *Handlers) handleSaveDatabase(w http.ResponseWriter, r *http.Request) {
@@ -318,7 +347,7 @@ func (h *Handlers) handleUploadAttachment(w http.ResponseWriter, r *http.Request
 		})
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	_ = templates.AttachmentList(items).Render(r.Context(), w)
+	_ = templates.AttachmentList(path, items).Render(r.Context(), w)
 }
 
 func (h *Handlers) handlePreview(w http.ResponseWriter, r *http.Request) {
@@ -423,6 +452,40 @@ func (h *Handlers) handleSyncStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = templates.SyncStatus(last, len(changes)).Render(r.Context(), w)
+}
+
+func (h *Handlers) handleSettings(w http.ResponseWriter, r *http.Request) {
+	noteList, _ := h.notes.List()
+	dbList, _ := h.databases.List()
+	tasks, _ := vaultparse.ListOpenTasks(h.vault)
+
+	settings := templates.SettingsPage{
+		VaultName:       filepath.Base(h.vault.Root),
+		VaultPath:       h.vault.Root,
+		PageCount:       len(noteList),
+		DatabaseCount:   len(dbList),
+		OpenTaskCount:   len(tasks),
+		AppVersion:      "0.1.0",
+		SyncIntervalMin: 15,
+		SyncSource:      "notion",
+		SyncSink:        "gdrive",
+	}
+	if h.connectors != nil {
+		cfg := h.connectors.Config()
+		settings.AutoSync = cfg.AutoSync
+		settings.SyncIntervalMin = cfg.SyncIntervalMin
+		settings.SyncSource = cfg.Source
+		settings.SyncSink = cfg.Sink
+	}
+
+	data := h.pageData("settings")
+	data.Settings = &settings
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if r.Header.Get("HX-Request") == "true" {
+		_ = templates.SettingsPanel(settings).Render(r.Context(), w)
+		return
+	}
+	_ = templates.Layout(data).Render(r.Context(), w)
 }
 
 func (h *Handlers) handleConnectors(w http.ResponseWriter, r *http.Request) {
@@ -540,8 +603,10 @@ func (h *Handlers) handleReveal(w http.ResponseWriter, r *http.Request) {
 		abs, err = h.vault.NoteAbsPath(req.Path)
 	case "database":
 		abs, err = h.vault.DatabaseAbsPath(req.Path)
+	case "vault":
+		abs = h.vault.Root
 	default:
-		http.Error(w, "kind must be note or database", http.StatusBadRequest)
+		http.Error(w, "kind must be note, database, or vault", http.StatusBadRequest)
 		return
 	}
 	if err != nil {

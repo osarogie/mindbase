@@ -11,32 +11,41 @@ import {
 } from 'react';
 import {
   defaultVaultPath,
+  deleteVaultItem as deleteVaultItemNative,
   ensureDailyNote,
   getNote,
+  listOpenTasks,
   open,
   saveNote,
   search,
   vaultSnapshot,
   type Note,
+  type OpenTask,
   type VaultItem,
+  type VaultItemKind,
 } from 'mindbase';
 import { newPagePath, todayISO } from '../utils/noteContent';
+import { snapshotVaultItems } from '../utils/vaultItems';
 
 interface VaultContextValue {
   vaultPath: string;
   vaultName: string;
   items: VaultItem[];
+  openTasks: OpenTask[];
+  openTaskCount: number;
   loading: boolean;
   refreshing: boolean;
   ready: boolean;
   error: string | null;
   clearError: () => void;
   refresh: (silent?: boolean) => Promise<void>;
+  syncOpenTaskCount: () => Promise<void>;
   runSearch: (query: string) => Promise<VaultItem[]>;
   createPage: () => Promise<Note>;
   openToday: () => Promise<Note>;
   loadNote: (path: string) => Promise<Note>;
   saveNoteContent: (path: string, content: string) => Promise<Note>;
+  deleteVaultItem: (kind: VaultItemKind, path: string) => Promise<void>;
 }
 
 const VaultContext = createContext<VaultContextValue | null>(null);
@@ -45,6 +54,8 @@ export function VaultProvider({ children }: { children: ReactNode }) {
   const [vaultPath] = useState(() => defaultVaultPath());
   const [vaultName, setVaultName] = useState('');
   const [items, setItems] = useState<VaultItem[]>([]);
+  const [openTasks, setOpenTasks] = useState<OpenTask[]>([]);
+  const [openTaskCount, setOpenTaskCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [ready, setReady] = useState(false);
@@ -71,20 +82,45 @@ export function VaultProvider({ children }: { children: ReactNode }) {
     }
   }, [vaultPath]);
 
+  const applyOpenTasks = useCallback((tasks: OpenTask[]) => {
+    setOpenTasks(tasks);
+    setOpenTaskCount(tasks.length);
+  }, []);
+
+  const fetchOpenTasks = useCallback(async () => {
+    await ensureOpen();
+    const tasks = await listOpenTasks();
+    applyOpenTasks(tasks);
+    return tasks;
+  }, [applyOpenTasks, ensureOpen]);
+
   const refresh = useCallback(
     async (silent = false) => {
       if (!silent) setRefreshing(true);
       try {
         await ensureOpen();
         const snap = await vaultSnapshot();
-        setItems(snap.vault_items);
+        setItems(snapshotVaultItems(snap));
         setVaultName(snap.info.name);
+        try {
+          await fetchOpenTasks();
+        } catch {
+          // Keep the last known task list if a refresh fails mid-flight.
+        }
       } finally {
         if (!silent) setRefreshing(false);
       }
     },
-    [ensureOpen],
+    [ensureOpen, fetchOpenTasks],
   );
+
+  const syncOpenTaskCount = useCallback(async () => {
+    try {
+      await fetchOpenTasks();
+    } catch {
+      // Keep the last known task list if sync fails.
+    }
+  }, [fetchOpenTasks]);
 
   const bootstrap = useCallback(async () => {
     setLoading(true);
@@ -109,7 +145,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
       const q = query.trim();
       if (!q) {
         await refresh(true);
-        return items;
+        return [];
       }
 
       setLoading(true);
@@ -136,7 +172,7 @@ export function VaultProvider({ children }: { children: ReactNode }) {
         setLoading(false);
       }
     },
-    [ensureOpen, items, refresh],
+    [ensureOpen, refresh],
   );
 
   const createPage = useCallback(async () => {
@@ -188,9 +224,31 @@ export function VaultProvider({ children }: { children: ReactNode }) {
       try {
         await ensureOpen();
         const saved = await saveNote(path, content);
+        setItems((prev) =>
+          prev.map((item) =>
+            item.kind === 'note' && item.path === path ? { ...item, title: saved.title } : item,
+          ),
+        );
         await refresh(true);
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         return saved;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        throw e;
+      }
+    },
+    [ensureOpen, refresh],
+  );
+
+  const deleteVaultItem = useCallback(
+    async (kind: VaultItemKind, path: string) => {
+      setError(null);
+      try {
+        await ensureOpen();
+        await deleteVaultItemNative(kind, path);
+        await refresh(true);
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -205,32 +263,40 @@ export function VaultProvider({ children }: { children: ReactNode }) {
       vaultPath,
       vaultName,
       items,
+      openTasks,
+      openTaskCount,
       loading,
       refreshing,
       ready,
       error,
       clearError: () => setError(null),
       refresh,
+      syncOpenTaskCount,
       runSearch,
       createPage,
       openToday,
       loadNote,
       saveNoteContent,
+      deleteVaultItem,
     }),
     [
       vaultPath,
       vaultName,
       items,
+      openTasks,
+      openTaskCount,
       loading,
       refreshing,
       ready,
       error,
       refresh,
+      syncOpenTaskCount,
       runSearch,
       createPage,
       openToday,
       loadNote,
       saveNoteContent,
+      deleteVaultItem,
     ],
   );
 

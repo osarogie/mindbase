@@ -9,7 +9,7 @@ export default function SearchLayout() {
         contentStyle: { backgroundColor: colors.bg },
       }}
     >
-      <Stack.Screen name="index" options={{ headerShown: false }} />
+      <Stack.Screen name="index" />
       <Stack.Screen name="note/[...path]" options={{ headerShown: false }} />
     </Stack>
   );

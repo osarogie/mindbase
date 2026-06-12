@@ -40,7 +40,6 @@ install_name_tool -change libmindbase.dylib @rpath/libmindbase.dylib "$MACOS_DIR
 cp "$ROOT/macos/Mindbase/AppIcon.icns" "$RES/AppIcon.icns"
 cp "$ROOT/macos/Mindbase/Info.plist" "$CONTENTS/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable $APP_NAME" "$CONTENTS/Info.plist"
-cp "$ROOT/internal/ui/static/rich-editor-frame.html" "$RES/rich-editor-frame.html"
 chmod +x "$MACOS_DIR/$APP_NAME"
 
 echo "Built $APP (libmindbase embedded in Frameworks/)"

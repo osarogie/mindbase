@@ -6,11 +6,13 @@ package main
 import "C"
 
 import (
+	"context"
 	"encoding/json"
 	"sync"
 	"time"
 	"unsafe"
 
+	"github.com/osarogie/mindbase/internal/ai"
 	"github.com/osarogie/mindbase/internal/native"
 	"github.com/osarogie/mindbase/internal/search"
 )
@@ -86,6 +88,18 @@ func mindbase_save_note(path *C.char, content *C.char) *C.char {
 	return jsonReply(n, err)
 }
 
+//export mindbase_delete_vault_item
+func mindbase_delete_vault_item(kind *C.char, path *C.char) *C.char {
+	mu.Lock()
+	e := eng
+	mu.Unlock()
+	if e == nil {
+		return jsonReply(nil, errNotOpen)
+	}
+	err := e.DeleteVaultItem(C.GoString(kind), C.GoString(path))
+	return jsonReply(map[string]bool{"ok": err == nil}, err)
+}
+
 //export mindbase_get_database_markdown
 func mindbase_get_database_markdown(name *C.char) *C.char {
 	mu.Lock()
@@ -129,6 +143,42 @@ func mindbase_search(query *C.char) *C.char {
 		results = []search.Result{}
 	}
 	return jsonReply(results, nil)
+}
+
+//export mindbase_list_open_tasks
+func mindbase_list_open_tasks() *C.char {
+	mu.Lock()
+	e := eng
+	mu.Unlock()
+	if e == nil {
+		return jsonReply(nil, errNotOpen)
+	}
+	tasks, err := e.ListOpenTasks()
+	return jsonReply(tasks, err)
+}
+
+//export mindbase_get_csv_table
+func mindbase_get_csv_table(path *C.char) *C.char {
+	mu.Lock()
+	e := eng
+	mu.Unlock()
+	if e == nil {
+		return jsonReply(nil, errNotOpen)
+	}
+	table, err := e.GetCSVTable(C.GoString(path))
+	return jsonReply(table, err)
+}
+
+//export mindbase_read_file_payload
+func mindbase_read_file_payload(path *C.char) *C.char {
+	mu.Lock()
+	e := eng
+	mu.Unlock()
+	if e == nil {
+		return jsonReply(nil, errNotOpen)
+	}
+	payload, err := e.ReadFilePayload(C.GoString(path))
+	return jsonReply(payload, err)
 }
 
 //export mindbase_preview_html
@@ -234,6 +284,24 @@ func mindbase_html_to_markdown(html *C.char) *C.char {
 		return jsonReply(nil, err)
 	}
 	return jsonReply(map[string]string{"markdown": md}, nil)
+}
+
+//export mindbase_ai_chat
+func mindbase_ai_chat(body *C.char) *C.char {
+	mu.Lock()
+	e := eng
+	mu.Unlock()
+	if e == nil {
+		return jsonReply(nil, errNotOpen)
+	}
+	var req ai.ChatRequest
+	if err := json.Unmarshal([]byte(C.GoString(body)), &req); err != nil {
+		return jsonReply(nil, err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+	res, err := e.AIChat(ctx, req)
+	return jsonReply(res, err)
 }
 
 var errNotOpen = &nativeError{"vault not open — call mindbase_open first"}

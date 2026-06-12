@@ -29,7 +29,7 @@ The product ships on **four surfaces** that share one Go core (`libmindbase`) bu
 2. **Files you own** — Notes are `.md`, databases are `.csv`; the UI reflects real paths and folders.
 3. **One vault, many views** — Sidebar library, journal, tasks, tags, and search are different lenses on the same data.
 4. **Progressive disclosure** — Power features (connectors, OAuth, AI compression) stay in dedicated areas; writing stays clean.
-5. **Cross-platform parity where it matters** — Read/edit/search everywhere; connectors and rich embeds skew web/desktop first.
+5. **Cross-platform parity** — Every feature and spec must be available on web, macOS, and mobile. Shared logic belongs in Go; UI adapts to each platform without dropping capability.
 6. **Agent-friendly** — Structured history (`mind log`) and predictable IA help humans and AI agents navigate the vault.
 
 ---

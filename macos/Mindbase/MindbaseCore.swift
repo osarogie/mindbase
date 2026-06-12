@@ -119,6 +119,17 @@ enum MindbaseCore {
         return payload.path
     }
 
+    static func wysiwygPage(path: String, content: String) throws -> String {
+        let payload: HTMLPayload = try decode(HTMLPayload.self, call("mindbase_wysiwyg_page", path, content))
+        return payload.html
+    }
+
+    static func htmlToMarkdown(_ html: String) throws -> String {
+        struct MarkdownPayload: Decodable { let markdown: String }
+        let payload: MarkdownPayload = try decode(MarkdownPayload.self, call("mindbase_html_to_markdown", html))
+        return payload.markdown
+    }
+
     private static func toVaultItem(_ dto: VaultItemDTO) -> VaultItem {
         VaultItem(
             id: dto.id,
@@ -169,6 +180,12 @@ enum MindbaseCore {
             return args[0].withCString { mindbase_ensure_daily_note(mut($0)) }
         case ("mindbase_ensure_weekly_note", 0):
             return mindbase_ensure_weekly_note()
+        case ("mindbase_wysiwyg_page", 2):
+            return args[0].withCString { p in
+                args[1].withCString { c in mindbase_wysiwyg_page(mut(p), mut(c)) }
+            }
+        case ("mindbase_html_to_markdown", 1):
+            return args[0].withCString { mindbase_html_to_markdown(mut($0)) }
         default:
             return nil
         }

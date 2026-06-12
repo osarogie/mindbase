@@ -1,5 +1,5 @@
-import { VaultListScreen } from '../../../src/screens/VaultListScreen';
+import { SearchScreen } from '../../../src/screens/SearchScreen';
 
-export default function SearchScreen() {
-  return <VaultListScreen mode="search" />;
+export default function SearchTab() {
+  return <SearchScreen />;
 }

@@ -92,9 +92,13 @@ extern char* mindbase_open(char* vaultPath);
 extern char* mindbase_vault_snapshot(void);
 extern char* mindbase_get_note(char* path);
 extern char* mindbase_save_note(char* path, char* content);
+extern char* mindbase_delete_vault_item(char* kind, char* path);
 extern char* mindbase_get_database_markdown(char* name);
 extern char* mindbase_save_database_markdown(char* name, char* content);
 extern char* mindbase_search(char* query);
+extern char* mindbase_list_open_tasks(void);
+extern char* mindbase_get_csv_table(char* path);
+extern char* mindbase_read_file_payload(char* path);
 extern char* mindbase_preview_html(char* path);
 extern char* mindbase_ensure_daily_note(char* isoDate);
 extern char* mindbase_ensure_weekly_note(void);
@@ -102,6 +106,7 @@ extern char* mindbase_note_history(char* path, int limit);
 extern char* mindbase_note_at_rev(char* path, char* rev);
 extern char* mindbase_wysiwyg_page(char* path, char* content);
 extern char* mindbase_html_to_markdown(char* html);
+extern char* mindbase_ai_chat(char* body);
 
 #ifdef __cplusplus
 }

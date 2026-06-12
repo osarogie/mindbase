@@ -41,7 +41,10 @@ struct DocumentEditorView: View {
 
             HStack(spacing: 0) {
                 if appModel.editorMode != .preview {
-                    RichTextEditorWebView(markdown: $appModel.noteContent) {
+                    RichTextEditorWebView(
+                        markdown: $appModel.noteContent,
+                        documentPath: path
+                    ) {
                         appModel.onContentChanged()
                     }
                     .frame(minWidth: 200)

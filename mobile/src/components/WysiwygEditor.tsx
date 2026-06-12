@@ -17,21 +17,28 @@ interface Props {
   path: string;
   content: string;
   onChange: (markdown: string) => void;
+  onFocusChange?: (focused: boolean) => void;
+  onSelectionToolbarChange?: (visible: boolean) => void;
 }
 
 export interface WysiwygEditorHandle {
-  insertBlock: (block: 'h1' | 'h2' | 'list' | 'task' | 'quote' | 'code') => void;
+  insertBlock: (block: 'h1' | 'h2' | 'h3' | 'list' | 'ordered' | 'task' | 'quote' | 'code') => void;
+  insertSlashCommand: (commandId: string) => void;
   applyInlineFormat: (format: 'bold' | 'italic') => void;
   flushPendingChanges: () => Promise<string>;
 }
 
 type BridgeMessage =
   | { type: 'ready' }
-  | { type: 'change'; html: string }
-  | { type: 'sync'; html: string }
-  | { type: 'height'; value: number };
+  | { type: 'change'; markdown?: string; html?: string }
+  | { type: 'sync'; markdown?: string; html?: string }
+  | { type: 'height'; value: number }
+  | { type: 'focus' }
+  | { type: 'blur' }
+  | { type: 'stats'; words: number; chars: number }
+  | { type: 'selectionToolbar'; visible: boolean };
 
-const INSERT_BLOCKS: Record<string, string> = {
+const LEGACY_INSERT_BLOCKS: Record<string, string> = {
   h1: '<h1>Heading</h1><p><br/></p>',
   h2: '<h2>Heading</h2><p><br/></p>',
   list: '<ul><li>Item</li></ul><p><br/></p>',
@@ -40,8 +47,19 @@ const INSERT_BLOCKS: Record<string, string> = {
   code: '<pre><code>code</code></pre><p><br/></p>',
 };
 
-const SYNC_HTML_JS = `
+const SYNC_MARKDOWN_JS = `
 (function () {
+  if (window.mindbaseFlushSync) {
+    window.mindbaseFlushSync();
+    return;
+  }
+  if (window.mindbaseGetMarkdown && window.ReactNativeWebView) {
+    window.ReactNativeWebView.postMessage(JSON.stringify({
+      type: 'sync',
+      markdown: window.mindbaseGetMarkdown()
+    }));
+    return;
+  }
   var doc = document.getElementById('doc');
   if (!doc || !window.ReactNativeWebView) return;
   window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'sync', html: doc.innerHTML }));
@@ -50,27 +68,39 @@ true;
 `;
 
 export const WysiwygEditor = memo(
-  forwardRef<WysiwygEditorHandle, Props>(function WysiwygEditor({ path, content, onChange }, ref) {
+  forwardRef<WysiwygEditorHandle, Props>(function WysiwygEditor(
+    { path, content, onChange, onFocusChange, onSelectionToolbarChange },
+    ref,
+  ) {
     const webRef = useRef<WebView>(null);
     const [pageHtml, setPageHtml] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [pendingHtml, setPendingHtml] = useState<string | null>(null);
+    const [pendingMarkdown, setPendingMarkdown] = useState<string | null>(null);
     const lastEmitted = useRef(content);
     const skipNextExternal = useRef(false);
     const pendingHtmlRef = useRef<string | null>(null);
-    const syncResolverRef = useRef<((html: string) => void) | null>(null);
+    const syncResolverRef = useRef<((markdown: string) => void) | null>(null);
 
-    const applyMarkdown = useCallback(
-      async (html: string) => {
-        const markdown = await htmlToMarkdown(html);
+    const emitMarkdown = useCallback(
+      (markdown: string) => {
         skipNextExternal.current = true;
         lastEmitted.current = markdown;
         pendingHtmlRef.current = null;
         setPendingHtml(null);
+        setPendingMarkdown(null);
         onChange(markdown);
         return markdown;
       },
       [onChange],
+    );
+
+    const applyHtml = useCallback(
+      async (html: string) => {
+        const markdown = await htmlToMarkdown(html);
+        return emitMarkdown(markdown);
+      },
+      [emitMarkdown],
     );
 
     const loadPage = useCallback(
@@ -101,30 +131,55 @@ export const WysiwygEditor = memo(
     }, [content, loadPage]);
 
     useDebouncedEffect(() => {
+      if (pendingMarkdown != null) {
+        emitMarkdown(pendingMarkdown);
+        return;
+      }
       if (!pendingHtml) return;
-      void applyMarkdown(pendingHtml).catch(() => {});
-    }, [pendingHtml, applyMarkdown], 320);
+      void applyHtml(pendingHtml).catch(() => {});
+    }, [pendingHtml, pendingMarkdown, applyHtml, emitMarkdown], 320);
 
     useImperativeHandle(ref, () => ({
       insertBlock(block) {
-        const html = INSERT_BLOCKS[block];
-        if (!html) return;
-        webRef.current?.injectJavaScript(`window.mindbaseInsertHtml(${JSON.stringify(html)}); true;`);
+        webRef.current?.injectJavaScript(`
+          if (window.mindbaseInsertBlock) {
+            window.mindbaseInsertBlock(${JSON.stringify(block)});
+          } else if (window.mindbaseInsertHtml) {
+            window.mindbaseInsertHtml(${JSON.stringify(LEGACY_INSERT_BLOCKS[block] ?? '')});
+          }
+          true;
+        `);
+      },
+      insertSlashCommand(commandId) {
+        webRef.current?.injectJavaScript(`
+          if (window.mindbaseRunSlashCommand) {
+            window.mindbaseRunSlashCommand(${JSON.stringify(commandId)});
+          }
+          true;
+        `);
       },
       applyInlineFormat(format) {
-        const cmd = format === 'bold' ? 'bold' : 'italic';
-        webRef.current?.injectJavaScript(`window.mindbaseExecFormat(${JSON.stringify(cmd)}); true;`);
+        webRef.current?.injectJavaScript(`
+          if (window.mindbaseExecFormat) {
+            window.mindbaseExecFormat(${JSON.stringify(format)});
+          }
+          true;
+        `);
       },
       flushPendingChanges() {
         return new Promise<string>((resolve) => {
           syncResolverRef.current = resolve;
-          webRef.current?.injectJavaScript(SYNC_HTML_JS);
+          webRef.current?.injectJavaScript(SYNC_MARKDOWN_JS);
           setTimeout(() => {
             if (syncResolverRef.current) {
-              const fallback = pendingHtmlRef.current;
               syncResolverRef.current = null;
+              if (pendingMarkdown != null) {
+                resolve(emitMarkdown(pendingMarkdown));
+                return;
+              }
+              const fallback = pendingHtmlRef.current;
               if (fallback) {
-                void applyMarkdown(fallback).then(resolve);
+                void applyHtml(fallback).then(resolve);
               } else {
                 resolve(lastEmitted.current);
               }
@@ -137,15 +192,41 @@ export const WysiwygEditor = memo(
     const onMessage = (event: WebViewMessageEvent) => {
       try {
         const msg = JSON.parse(event.nativeEvent.data) as BridgeMessage;
+        if (msg.type === 'ready') {
+          return;
+        }
+        if (msg.type === 'focus') {
+          onFocusChange?.(true);
+          return;
+        }
+        if (msg.type === 'blur') {
+          onFocusChange?.(false);
+          return;
+        }
+        if (msg.type === 'selectionToolbar') {
+          onSelectionToolbarChange?.(msg.visible);
+          return;
+        }
         if (msg.type === 'change') {
-          pendingHtmlRef.current = msg.html;
-          setPendingHtml(msg.html);
+          if (typeof msg.markdown === 'string') {
+            setPendingMarkdown(msg.markdown);
+            return;
+          }
+          if (msg.html) {
+            pendingHtmlRef.current = msg.html;
+            setPendingHtml(msg.html);
+          }
         }
         if (msg.type === 'sync') {
           const resolver = syncResolverRef.current;
           syncResolverRef.current = null;
-          if (resolver) {
-            void applyMarkdown(msg.html).then(resolver);
+          if (!resolver) return;
+          if (typeof msg.markdown === 'string') {
+            resolver(emitMarkdown(msg.markdown));
+            return;
+          }
+          if (msg.html) {
+            void applyHtml(msg.html).then(resolver);
           }
         }
       } catch {

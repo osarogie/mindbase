@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/osarogie/mindbase/internal/markdown"
 	"github.com/osarogie/mindbase/internal/snapshots"
 	"github.com/osarogie/mindbase/internal/vault"
 	"github.com/osarogie/mindbase/internal/vaultgit"
@@ -63,12 +64,17 @@ func (s *Service) List() ([]Entry, error) {
 			return err
 		}
 
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+
 		attachDir, _ := s.vault.ResolveNotePath(s.vault.AttachmentDir(rel))
 		hasAttach := dirExists(attachDir)
 
 		entries = append(entries, Entry{
 			Path:      rel,
-			Title:     titleFromPath(rel),
+			Title:     noteTitle(string(data), rel),
 			Modified:  info.ModTime(),
 			Size:      info.Size(),
 			HasAttach: hasAttach,
@@ -93,10 +99,11 @@ func (s *Service) Get(relPath string) (*Note, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read note: %w", err)
 	}
+	content := string(data)
 	return &Note{
 		Path:    filepath.ToSlash(relPath),
-		Title:   titleFromPath(relPath),
-		Content: string(data),
+		Title:   noteTitle(content, relPath),
+		Content: content,
 	}, nil
 }
 
@@ -134,9 +141,8 @@ func (s *Service) Delete(relPath string) error {
 	return nil
 }
 
-func titleFromPath(rel string) string {
-	base := filepath.Base(rel)
-	return strings.TrimSuffix(base, filepath.Ext(base))
+func noteTitle(content, relPath string) string {
+	return markdown.TitleFromContent(content, markdown.TitleFromPath(relPath))
 }
 
 func dirExists(path string) bool {

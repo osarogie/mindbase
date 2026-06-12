@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Save, Trash2, Upload, Eye, Edit3 } from 'lucide-react'
+import { Save, Trash2, Upload, Eye, Edit3, FileCode2 } from 'lucide-react'
 import { api, AttachmentEntry, connectWS } from '../api'
+import { LexicalEditor } from './LexicalEditor'
 import { MarkdownEditor } from './MarkdownEditor'
 import { MarkdownPreview } from './MarkdownPreview'
+
+type EditorMode = 'rich' | 'markdown' | 'preview' | 'split'
 
 interface Props {
   path: string
@@ -12,7 +15,7 @@ interface Props {
 export function NoteView({ path, onDeleted }: Props) {
   const [content, setContent] = useState('')
   const [saved, setSaved] = useState('')
-  const [mode, setMode] = useState<'edit' | 'preview' | 'split'>('split')
+  const [mode, setMode] = useState<EditorMode>('rich')
   const [attachments, setAttachments] = useState<AttachmentEntry[]>([])
   const [status, setStatus] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
@@ -69,8 +72,11 @@ export function NoteView({ path, onDeleted }: Props) {
         <div className="header-actions">
           {status && <span className="status">{status}</span>}
           <div className="mode-toggle">
-            <button type="button" className={mode === 'edit' ? 'active' : ''} onClick={() => setMode('edit')} title="Edit">
+            <button type="button" className={mode === 'rich' ? 'active' : ''} onClick={() => setMode('rich')} title="Rich text">
               <Edit3 size={16} />
+            </button>
+            <button type="button" className={mode === 'markdown' ? 'active' : ''} onClick={() => setMode('markdown')} title="Markdown source">
+              <FileCode2 size={16} />
             </button>
             <button type="button" className={mode === 'split' ? 'active' : ''} onClick={() => setMode('split')} title="Split">
               ⬌
@@ -89,9 +95,10 @@ export function NoteView({ path, onDeleted }: Props) {
       </header>
 
       <div className={`editor-pane mode-${mode}`}>
-        {(mode === 'edit' || mode === 'split') && (
-          <MarkdownEditor value={content} onChange={setContent} />
+        {(mode === 'rich' || mode === 'split') && (
+          <LexicalEditor value={content} onChange={setContent} />
         )}
+        {mode === 'markdown' && <MarkdownEditor value={content} onChange={setContent} />}
         {(mode === 'preview' || mode === 'split') && (
           <MarkdownPreview content={content} notePath={path} />
         )}

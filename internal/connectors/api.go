@@ -202,10 +202,12 @@ func (a *API) handleAIChat(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	svc := ai.NewService(a.svc.Vault(), aiCfg)
-	creds := resolveCredentials(a.svc.Vault(), a.svc.Config())
-	res, err := svc.ChatWithKey(r.Context(), creds.AnthropicKey, req)
+	res, err := a.svc.AIChat(r.Context(), req)
 	if err != nil {
+		if err.Error() == "ai assistant disabled" {
+			writeError(w, http.StatusBadRequest, err)
+			return
+		}
 		writeError(w, http.StatusBadGateway, err)
 		return
 	}

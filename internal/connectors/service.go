@@ -1,8 +1,11 @@
 package connectors
 
 import (
+	"context"
+	"fmt"
 	"time"
 
+	"github.com/osarogie/mindbase/internal/ai"
 	"github.com/osarogie/mindbase/internal/connectors/cache"
 	"github.com/osarogie/mindbase/internal/connectors/gdrive"
 	"github.com/osarogie/mindbase/internal/connectors/notion"
@@ -139,6 +142,15 @@ func (s *Service) ImportNotion() (*notion.ImportResult, error) {
 		subdir = "notion"
 	}
 	return notion.Import(s.vault, creds.NotionToken, subdir)
+}
+
+func (s *Service) AIChat(ctx context.Context, req ai.ChatRequest) (*ai.ChatResponse, error) {
+	if !s.config.AI.Enabled {
+		return nil, fmt.Errorf("ai assistant disabled")
+	}
+	creds := resolveCredentials(s.vault, s.config)
+	svc := ai.NewService(s.vault, s.config.AI)
+	return svc.ChatWithKey(ctx, creds.AnthropicKey, req)
 }
 
 func (s *Service) SyncGDrive() (*gdrive.SyncResult, error) {

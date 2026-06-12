@@ -4,7 +4,8 @@
   "packageManager": "bun@1.3.14",
   "workspaces": [
     "mobile",
-    "web"
+    "web",
+    "editor-ui"
   ],
   "scripts": {
     "mobile:prebuild": "bun run --cwd mobile prebuild",
@@ -13,6 +14,14 @@
     "mobile:ios": "bun run --cwd mobile ios",
     "mobile:android": "bun run --cwd mobile android",
     "web:build": "bun run --cwd web build",
-    "web:dev": "bun run --cwd web dev"
+    "web:dev": "bun run --cwd web dev",
+    "editor-ui:build": "bun run --cwd editor-ui build",
+    "ui-css": "bunx @tailwindcss/cli -i internal/ui/static/tailwind.css -o internal/ui/static/tw.css --minify",
+    "icons": "node scripts/generate-icons.mjs"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.1.11",
+    "sharp": "^0.35.1",
+    "tailwindcss": "^4.1.11"
   }
 }

@@ -5,7 +5,7 @@ export const MindbaseTheme = {
   ...DefaultTheme,
   colors: {
     ...DefaultTheme.colors,
-    primary: colors.accent,
+    primary: colors.primary,
     background: colors.bg,
     card: colors.surfaceElevated,
     text: colors.text,

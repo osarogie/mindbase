@@ -16,6 +16,9 @@ class MindbaseNativeModule extends NativeModule {
   saveNote(_path: string, _content: string): Promise<string> {
     return Promise.reject(new Error('Mindbase is not available on web'));
   }
+  deleteVaultItem(_kind: string, _path: string): Promise<string> {
+    return Promise.reject(new Error('Mindbase is not available on web'));
+  }
   getDatabaseMarkdown(_name: string): Promise<string> {
     return Promise.reject(new Error('Mindbase is not available on web'));
   }
@@ -23,6 +26,15 @@ class MindbaseNativeModule extends NativeModule {
     return Promise.reject(new Error('Mindbase is not available on web'));
   }
   search(_query: string): Promise<string> {
+    return Promise.reject(new Error('Mindbase is not available on web'));
+  }
+  listOpenTasks(): Promise<string> {
+    return Promise.reject(new Error('Mindbase is not available on web'));
+  }
+  getCsvTable(_path: string): Promise<string> {
+    return Promise.reject(new Error('Mindbase is not available on web'));
+  }
+  readFilePayload(_path: string): Promise<string> {
     return Promise.reject(new Error('Mindbase is not available on web'));
   }
   previewHtml(_path: string): Promise<string> {
@@ -44,6 +56,9 @@ class MindbaseNativeModule extends NativeModule {
     return Promise.reject(new Error('Mindbase is not available on web'));
   }
   htmlToMarkdown(_html: string): Promise<string> {
+    return Promise.reject(new Error('Mindbase is not available on web'));
+  }
+  aiChat(_body: string): Promise<string> {
     return Promise.reject(new Error('Mindbase is not available on web'));
   }
 }

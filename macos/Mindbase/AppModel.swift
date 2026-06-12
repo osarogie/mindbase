@@ -28,6 +28,7 @@ final class AppModel: ObservableObject {
     @Published var statusMessage = ""
     @Published var isLoading = false
     @Published var errorMessage: String?
+    @Published var commandPalettePresented = false
 
     private let authAPI = AuthAPIClient()
     private var vaultStore: VaultStore?

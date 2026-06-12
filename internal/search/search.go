@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/osarogie/mindbase/internal/markdown"
 	"github.com/osarogie/mindbase/internal/vault"
 )
 
@@ -91,7 +92,7 @@ func (s *Service) searchFile(fullPath, root, typ string, terms []string, q strin
 
 	return &Result{
 		Path:     rel,
-		Title:    strings.TrimSuffix(filepath.Base(rel), filepath.Ext(rel)),
+		Title:    markdown.TitleFromContent(string(data), markdown.TitleFromPath(rel)),
 		Type:     typ,
 		Snippet:  snippet(string(data), q),
 		Score:    score,

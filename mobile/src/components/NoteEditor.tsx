@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { memo, useImperativeHandle, useRef, useState, forwardRef } from 'react';
+import { memo, useImperativeHandle, useRef, useState, forwardRef, useCallback, useMemo } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,14 +13,21 @@ import {
 import {
   KeyboardAvoidingView,
   KeyboardStickyView,
+  useKeyboardState,
 } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNativeTabBarInset } from '../hooks/useNativeTabBarInset';
 import { colors, radii, spacing, typography } from '../theme';
+import { FileInfoPanel } from './FileInfoPanel';
+import { OverflowMenuButton, type OverflowMenuAction } from './OverflowMenuButton';
 import { HistoryPanel } from './HistoryPanel';
+import { AIAssistantPanel } from './AIAssistantPanel';
 import { IconButton } from './IconButton';
 import { SafeTopSpacer } from './SafeTopSpacer';
 import { WysiwygEditor, type WysiwygEditorHandle } from './WysiwygEditor';
+import { useVault } from '../context/VaultContext';
+import { fileInfoFromNote } from '../utils/fileInfo';
+import { extractTitle } from '../utils/noteContent';
+import { insertMenuForKind, type InsertAction } from '../utils/editorInsertMenu';
 import type { Note } from 'mindbase';
 
 interface Props {
@@ -27,10 +35,13 @@ interface Props {
   content: string;
   dirty: boolean;
   saving: boolean;
+  documentKind?: 'note' | 'database';
   onBack?: () => void;
   includeTopInset?: boolean;
   onChange: (content: string) => void;
   onSave: (contentOverride?: string) => void | Promise<void>;
+  onEditorFocusChange?: (focused: boolean) => void;
+  onDelete?: () => void | Promise<void>;
 }
 
 export interface NoteEditorHandle {
@@ -57,17 +68,34 @@ export const NoteEditor = memo(
       content,
       dirty,
       saving,
+      documentKind = 'note',
       onBack,
       includeTopInset = true,
       onChange,
       onSave,
+      onEditorFocusChange,
+      onDelete,
     },
     ref,
   ) {
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
+  const [fileInfoOpen, setFileInfoOpen] = useState(false);
+  const [editorFocused, setEditorFocused] = useState(false);
+  const [selectionToolbarOpen, setSelectionToolbarOpen] = useState(false);
   const editorRef = useRef<WysiwygEditorHandle>(null);
   const insets = useSafeAreaInsets();
-  const tabBarInset = useNativeTabBarInset();
+  const keyboardVisible = useKeyboardState((state) => state.isVisible);
+  const { vaultPath } = useVault();
+  const pageTitle = extractTitle(content, note.title);
+
+  const overflowActions = useMemo((): OverflowMenuAction[] => {
+    const actions: OverflowMenuAction[] = [{ label: 'File info', onPress: () => setFileInfoOpen(true) }];
+    if (onDelete) {
+      actions.push({ label: 'Delete', onPress: () => void onDelete(), destructive: true });
+    }
+    return actions;
+  }, [onDelete]);
 
   const handleSave = async () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -91,18 +119,50 @@ export const NoteEditor = memo(
     void Haptics.selectionAsync();
   };
 
-  const toolbarBottomInset = Math.max(spacing.sm, insets.bottom);
+  const runInsertAction = useCallback((action: InsertAction) => {
+    if (action.kind === 'block') {
+      editorRef.current?.insertBlock(action.block);
+    } else {
+      editorRef.current?.insertSlashCommand(action.id);
+    }
+    void Haptics.selectionAsync();
+  }, []);
+
+  const openInsertMenu = useCallback(() => {
+    const items = insertMenuForKind(documentKind);
+    Alert.alert(
+      'Insert',
+      undefined,
+      [
+        ...items.map((item) => ({
+          text: item.label,
+          onPress: () => runInsertAction(item.action),
+        })),
+        { text: 'Cancel', style: 'cancel' as const },
+      ],
+    );
+  }, [documentKind, runInsertAction]);
+
+  const toolbarBottomInset = keyboardVisible
+    ? spacing.sm
+    : Math.max(spacing.sm, insets.bottom);
 
   return (
     <View style={styles.root}>
       {includeTopInset ? <SafeTopSpacer backgroundColor={colors.editorBg} /> : null}
 
-      <View style={styles.topBar}>
+      <View style={[styles.topBar, editorFocused && styles.topBarImmersive]}>
         <View style={styles.topLeft}>
           {onBack ? <IconButton icon="chevron-back" onPress={onBack} /> : null}
-          <Text style={styles.path} numberOfLines={1}>
-            {note.path}
+          <Text style={styles.pageTitle} numberOfLines={1}>
+            {pageTitle}
           </Text>
+          <OverflowMenuButton
+            title={pageTitle}
+            actions={overflowActions}
+            accessibilityLabel="Page options"
+            style={styles.menuBtn}
+          />
         </View>
         <View style={styles.topActions}>
           <View style={styles.statusRow}>
@@ -116,6 +176,14 @@ export const NoteEditor = memo(
             accessibilityLabel="Version history"
           >
             <Ionicons name="time-outline" size={18} color={colors.textSecondary} />
+          </Pressable>
+          <Pressable
+            onPress={() => setAiOpen(true)}
+            style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
+            accessibilityRole="button"
+            accessibilityLabel="AI assistant"
+          >
+            <Ionicons name="sparkles-outline" size={18} color={colors.textSecondary} />
           </Pressable>
           <Pressable
             accessibilityRole="button"
@@ -139,15 +207,33 @@ export const NoteEditor = memo(
       <KeyboardAvoidingView
         style={styles.editorStack}
         behavior="padding"
-        keyboardVerticalOffset={tabBarInset}
+        automaticOffset
+        keyboardVerticalOffset={0}
       >
         <View style={[styles.editorPane, { paddingBottom: TOOLBAR_DOCK_HEIGHT }]}>
-          <WysiwygEditor ref={editorRef} path={note.path} content={content} onChange={onChange} />
+          <WysiwygEditor
+            ref={editorRef}
+            path={note.path}
+            content={content}
+            onChange={onChange}
+            onFocusChange={(focused) => {
+              setEditorFocused(focused);
+              onEditorFocusChange?.(focused);
+              if (!focused) setSelectionToolbarOpen(false);
+            }}
+            onSelectionToolbarChange={setSelectionToolbarOpen}
+          />
         </View>
       </KeyboardAvoidingView>
 
-      <KeyboardStickyView offset={{ closed: 0, opened: tabBarInset }}>
-        <View style={[styles.toolbarDock, { paddingBottom: toolbarBottomInset }]}>
+      <KeyboardStickyView offset={{ closed: 0, opened: 0 }}>
+        <View
+          style={[
+            styles.toolbarDock,
+            { paddingBottom: toolbarBottomInset },
+            selectionToolbarOpen && styles.toolbarDockHidden,
+          ]}
+        >
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -176,6 +262,15 @@ export const NoteEditor = memo(
                 <Text style={styles.toolLabel}>{item.label}</Text>
               </Pressable>
             ))}
+            <Pressable
+              onPress={openInsertMenu}
+              style={({ pressed }) => [styles.toolChip, styles.insertChip, pressed && styles.toolChipPressed]}
+              accessibilityRole="button"
+              accessibilityLabel="Insert block"
+            >
+              <Ionicons name="add-circle-outline" size={14} color={colors.accent} />
+              <Text style={[styles.toolLabel, styles.insertLabel]}>Insert</Text>
+            </Pressable>
           </ScrollView>
         </View>
       </KeyboardStickyView>
@@ -188,6 +283,12 @@ export const NoteEditor = memo(
           onChange(restored);
           void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         }}
+      />
+      <AIAssistantPanel notePath={note.path} visible={aiOpen} onClose={() => setAiOpen(false)} />
+      <FileInfoPanel
+        visible={fileInfoOpen}
+        details={fileInfoFromNote({ ...note, title: pageTitle }, vaultPath, documentKind)}
+        onClose={() => setFileInfoOpen(false)}
       />
     </View>
   );
@@ -209,6 +310,9 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
     backgroundColor: colors.editorBg,
   },
+  topBarImmersive: {
+    opacity: 0.72,
+  },
   topLeft: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -216,11 +320,15 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
-  path: {
-    ...typography.caption,
-    fontSize: 12,
-    color: colors.textMuted,
+  pageTitle: {
+    ...typography.headline,
+    fontSize: 15,
+    color: colors.text,
     flex: 1,
+    minWidth: 0,
+  },
+  menuBtn: {
+    minWidth: 32,
   },
   statusRow: {
     flexDirection: 'row',
@@ -262,7 +370,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: radii.sm,
-    backgroundColor: colors.accent,
+    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -286,6 +394,10 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     backgroundColor: colors.editorBg,
   },
+  toolbarDockHidden: {
+    opacity: 0,
+    pointerEvents: 'none',
+  },
   toolbarContent: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
@@ -305,6 +417,13 @@ const styles = StyleSheet.create({
   },
   toolChipPressed: {
     backgroundColor: colors.border,
+  },
+  insertChip: {
+    borderColor: colors.accentSoft,
+    backgroundColor: colors.accentSoft,
+  },
+  insertLabel: {
+    color: colors.accent,
   },
   toolLabel: {
     fontSize: 12,

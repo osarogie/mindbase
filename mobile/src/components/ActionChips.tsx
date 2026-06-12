@@ -53,7 +53,7 @@ const styles = StyleSheet.create({
     minHeight: 38,
   },
   chipPrimary: {
-    backgroundColor: colors.accent,
+    backgroundColor: colors.primary,
   },
   chipPrimaryText: {
     ...typography.caption,

@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/osarogie/mindbase/internal/api"
@@ -25,10 +26,19 @@ func main() {
 	tlsCert := flag.String("tls-cert", "", "TLS certificate file (enables HTTPS and optional HTTP/3)")
 	tlsKey := flag.String("tls-key", "", "TLS private key file")
 	http3 := flag.Bool("http3", true, "Serve HTTP/3 over QUIC when TLS is enabled")
-	webDir := flag.String("web", "", "Legacy React web/dist path (optional; default uses templ UI)")
+	webDir := flag.String("web", "", "Path to React web/dist (overrides embedded UI)")
+	uiMode := flag.String("ui", "auto", "Web UI: auto (React if built, else templ), react, templ")
 	portFile := flag.String("portfile", "", "Write listening address to this file when ready")
 	embed := flag.Bool("embed", false, "Embedded mode for native apps (minimal stderr logging)")
 	flag.Parse()
+
+	mode := api.UIMode(strings.ToLower(strings.TrimSpace(*uiMode)))
+	switch mode {
+	case api.UIAuto, api.UIReact, api.UITempl:
+	default:
+		fmt.Fprintf(os.Stderr, "invalid -ui %q (use auto, react, or templ)\n", *uiMode)
+		os.Exit(1)
+	}
 
 	if (*tlsCert == "") != (*tlsKey == "") {
 		fmt.Fprintln(os.Stderr, "tls-cert and tls-key must both be set")
@@ -45,7 +55,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	srv, err := api.New(v, *webDir)
+	srv, err := api.New(v, mode, *webDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "create server: %v\n", err)
 		os.Exit(1)
@@ -80,8 +90,8 @@ func main() {
 
 	if !*embed {
 		ui := "templ+htmx"
-		if *webDir != "" {
-			ui = "legacy-react"
+		if srv.UsesReactUI() {
+			ui = "react"
 		}
 		scheme := "http"
 		if *tlsCert != "" {

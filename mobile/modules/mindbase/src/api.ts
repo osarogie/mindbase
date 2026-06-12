@@ -1,9 +1,14 @@
 import Native from './MindbaseModule';
 import type {
+  AIChatRequest,
+  AIChatResponse,
   Note,
   NoteHistory,
   NoteRevision,
   SearchResult,
+  OpenTask,
+  CSVTable,
+  FilePayload,
   VaultInfo,
   VaultSnapshot,
 } from './Mindbase.types';
@@ -45,6 +50,10 @@ export async function saveNote(path: string, content: string): Promise<Note> {
   return parseJSON(await Native.saveNote(path, content));
 }
 
+export async function deleteVaultItem(kind: string, path: string): Promise<void> {
+  parseJSON(await Native.deleteVaultItem(kind, path));
+}
+
 export async function getDatabaseMarkdown(name: string): Promise<string> {
   const payload = parseJSON<{ content: string }>(await Native.getDatabaseMarkdown(name));
   return payload.content;
@@ -56,6 +65,18 @@ export async function saveDatabaseMarkdown(name: string, content: string): Promi
 
 export async function search(query: string): Promise<SearchResult[]> {
   return parseJSON(await Native.search(query));
+}
+
+export async function listOpenTasks(): Promise<OpenTask[]> {
+  return parseJSON(await Native.listOpenTasks());
+}
+
+export async function getCsvTable(path: string): Promise<CSVTable> {
+  return parseJSON(await Native.getCsvTable(path));
+}
+
+export async function readFilePayload(path: string): Promise<FilePayload> {
+  return parseJSON(await Native.readFilePayload(path));
 }
 
 export async function previewHtml(path: string): Promise<string> {
@@ -99,4 +120,13 @@ export async function htmlToMarkdown(html: string): Promise<string> {
   }
   const payload = parseJSON<{ markdown: string }>(await Native.htmlToMarkdown(html));
   return payload.markdown;
+}
+
+export async function aiChat(req: AIChatRequest): Promise<AIChatResponse> {
+  if (typeof Native.aiChat !== 'function') {
+    throw new MindbaseError(
+      'aiChat native method missing — rebuild dev client: make libmindbase && cd mobile && bun ios',
+    );
+  }
+  return parseJSON(await Native.aiChat(JSON.stringify(req)));
 }

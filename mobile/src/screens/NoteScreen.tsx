@@ -4,20 +4,30 @@ import { useRef } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { NoteEditor, type NoteEditorHandle } from '../components/NoteEditor';
 import { useNote } from '../hooks/useNote';
+import { useVault } from '../context/VaultContext';
+import { useEditorTabs } from '../context/EditorTabsContext';
+import { editorTabId } from '../context/editorTabId';
 import { colors, spacing } from '../theme';
 
 interface Props {
   path: string;
   showBack?: boolean;
+  onBack?: () => void;
 }
 
-export function NoteScreen({ path, showBack = true }: Props) {
+export function NoteScreen({ path, showBack = true, onBack }: Props) {
   const router = useRouter();
   const editorRef = useRef<NoteEditorHandle>(null);
-  const { note, draft, dirty, loading, saving, setDraft, saveNow } = useNote(path);
+  const { deleteVaultItem } = useVault();
+  const { closeTab } = useEditorTabs();
+  const { note, draft, dirty, loading, saving, setDraft, saveNow } = useNote(path, { syncTabMeta: true });
 
   const handleBack = () => {
     if (!showBack) return;
+    if (onBack) {
+      onBack();
+      return;
+    }
     if (dirty) {
       Alert.alert('Unsaved changes', 'Save before leaving this page?', [
         { text: 'Keep editing', style: 'cancel' },
@@ -38,6 +48,27 @@ export function NoteScreen({ path, showBack = true }: Props) {
     router.back();
   };
 
+  const handleDelete = () => {
+    const title = note?.title || path;
+    Alert.alert('Delete page', `Delete "${title}" permanently?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          void (async () => {
+            await deleteVaultItem('note', path);
+            closeTab(editorTabId('note', path));
+            if (showBack) {
+              if (onBack) onBack();
+              else router.back();
+            }
+          })();
+        },
+      },
+    ]);
+  };
+
   if (loading || !note) {
     return (
       <SafeAreaView style={styles.root} edges={['top', 'left', 'right']}>
@@ -49,7 +80,6 @@ export function NoteScreen({ path, showBack = true }: Props) {
   }
 
   return (
-    <SafeAreaView style={styles.root} edges={['top', 'left', 'right']}>
       <NoteEditor
         ref={editorRef}
         note={note}
@@ -60,8 +90,8 @@ export function NoteScreen({ path, showBack = true }: Props) {
         onBack={showBack ? handleBack : undefined}
         onChange={setDraft}
         onSave={(content) => saveNow(content)}
+        onDelete={handleDelete}
       />
-    </SafeAreaView>
   );
 }
 

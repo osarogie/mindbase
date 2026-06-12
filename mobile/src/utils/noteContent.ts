@@ -1,6 +1,40 @@
+export function titleFromPath(path: string, fallback = 'Untitled'): string {
+  const base = path.split('/').pop() ?? path;
+  const stem = base.replace(/\.md$/i, '').replace(/\.csv$/i, '');
+  return stem || fallback;
+}
+
 export function extractTitle(content: string, fallback = 'Untitled'): string {
-  const match = content.match(/^#\s+(.+)$/m);
-  return match?.[1]?.trim() || fallback;
+  const trimmed = content.replace(/^\uFEFF/, '').trimStart();
+
+  if (trimmed.startsWith('---')) {
+    const end = trimmed.indexOf('\n---', 3);
+    if (end >= 0) {
+      const block = trimmed.slice(3, end);
+      const titleLine = block.match(/^title:\s*["']?([^"'\n]+?)["']?\s*$/m);
+      if (titleLine?.[1]?.trim()) return titleLine[1].trim();
+    }
+  }
+
+  const h1 = trimmed.match(/^#\s+(.+)$/m);
+  if (h1?.[1]?.trim()) return h1[1].trim();
+
+  const heading = trimmed.match(/^#{1,6}\s+(.+)$/m);
+  if (heading?.[1]?.trim()) return heading[1].trim();
+
+  return fallback;
+}
+
+export function resolveNoteTitle(path: string, title?: string, content?: string): string {
+  const fallback = titleFromPath(path);
+  if (content) {
+    const fromContent = extractTitle(content, '');
+    if (fromContent) return fromContent;
+  }
+  const trimmed = title?.trim();
+  if (trimmed && trimmed !== fallback) return trimmed;
+  if (trimmed) return trimmed;
+  return fallback;
 }
 
 export function setTitleInContent(content: string, title: string): string {

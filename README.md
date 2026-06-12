@@ -1,8 +1,21 @@
 # mindbase
 
-Local-first notes and data manager — **Go core** (`libmindbase`) with **templ/htmx web**, **SwiftUI macOS**, and **Expo mobile**.
+Local-first notes and data manager — **Go core** (`libmindbase`) with **React web**, **SwiftUI macOS**, and **Expo mobile**.
 
 Every save is git-tracked in the vault. Notes are plain markdown; databases are CSV; attachments stay on disk.
+
+**Cross-platform by default:** every feature and spec must ship on **web, macOS, and mobile** (unless explicitly marked experimental). Shared behavior lives in Go (`libmindbase`, vault format, connectors, AI, version history); each surface implements the same product contract with native UX.
+
+## Cross-platform contract
+
+| Layer | Shared across platforms |
+|-------|-------------------------|
+| **Data** | Vault layout, markdown notes, CSV databases, git history, `.mindbase` config |
+| **Core API** | `libmindbase` — open vault, read/write notes & DBs, search, WYSIWYG page, HTML↔MD, snapshots, AI chat |
+| **Product features** | Library, journal, tasks/tags, multi-tab editor, version history, slash/format tools, connectors, AI assistant |
+| **Formats** | Markdown, CSV, wiki links, embeds, attachments, frontmatter |
+
+When adding or changing a feature, define it once for all platforms, implement the Go/API path first, then land web + macOS + mobile in the same change (or split PRs that clearly track parity). Platform-specific chrome is fine; **capability gaps are not**.
 
 ## Quick start
 
@@ -29,23 +42,24 @@ Default vault for development: `./vault`. Override with `-vault` or `MINDBASE_VA
 
 ## Web UI
 
-The default UI is **templ + htmx + Alpine** (no Node build required for the main app).
+The default UI is **React** (Vite + Tailwind + shadcn/ui), embedded in the Go binary after `make react-ui`. Use `-ui templ` for the legacy **templ + htmx + Alpine** UI (no Node build).
 
-- **Paper light** design — warm paper palette, Literata serif for reading, centered page column
-- **Sepia dark** — follows `prefers-color-scheme: dark`
-- **Edit / Split / Preview** modes, `/` slash commands, format toolbar
-- **History** panel — browse and restore prior git versions per note
-- **✦ AI** floating panel — vault-aware Claude assistant
-- Mermaid diagrams, Excalidraw embeds, wiki links, database embeds
+| Mode | Command |
+|------|---------|
+| React (default after build) | `make run` or `make run-react` |
+| React dev (HMR) | `bun web:dev` + server with `-web web/dist -ui react` |
+| templ fallback | `make run-templ` or `-ui templ` |
 
-Design reference: [`docs/UI-DESIGN-BRIEF.md`](docs/UI-DESIGN-BRIEF.md)
+React features: sidebar navigation, note/database views, Lexical editor, shadcn components. Add UI with `cd web && bunx shadcn@latest add <name>`.
+
+The templ UI includes Tailwind utilities via `internal/ui/static/tw.css` (`make ui-css`).
 
 ```bash
-make dev      # :8090 — air hot reload (go, templ, js, css)
-make run      # :8780 — embedded static assets
+make dev         # :8090 — air hot reload (templ UI)
+make run         # :8780 — React if built, else templ
+make run-react   # build + embed React, then run
+make run-templ   # force templ UI
 ```
-
-Legacy React UI (optional): `bun web:dev` then `make run -web web/dist`.
 
 ## Version history
 
@@ -163,7 +177,8 @@ brew install rtk
 ## Development
 
 ```bash
-make tools            # verify pinned Go tools (air, templ)
+make tools            # verify pinned Go tools (air, templ, task)
+go tool task --list   # same workflows via Taskfile (https://taskfile.dev)
 make dev              # hot reload → http://localhost:8090
 make run              # production binary → http://localhost:8780
 make build            # compile bin/mindbase (runs templ generate)
@@ -173,6 +188,8 @@ make templ            # regenerate internal/ui/templates/*_templ.go
 make desktop          # macOS app + libmindbase.dylib
 make libmindbase      # build C shared library for native targets
 ```
+
+[Task](https://taskfile.dev) is pinned in `go.mod`; use `go tool task build`, `go tool task dev`, etc. (`Taskfile.yml` mirrors the Makefile).
 
 ### Server flags
 
@@ -188,6 +205,7 @@ Go tools are pinned in `go.mod`:
 tool (
     github.com/a-h/templ/cmd/templ
     github.com/air-verse/air
+    github.com/go-task/task/v3/cmd/task
 )
 ```
 
@@ -212,7 +230,7 @@ Install globally: `make install-cli`. Use `--json` on any command for structured
 
 ## Package manager (Bun)
 
-Bun workspaces cover mobile and the legacy React web UI:
+Bun workspaces cover mobile and the React web UI:
 
 ```bash
 bun install

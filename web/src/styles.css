@@ -5,8 +5,8 @@
   --border: #2e2e42;
   --text: #e8e8f0;
   --muted: #9898b0;
-  --accent: #7c6af7;
-  --accent-hover: #9585ff;
+  --accent: #6B5034;
+  --accent-hover: #5C4228;
   --danger: #e85555;
   --radius: 10px;
   font-family: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -85,7 +85,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .sidebar-header h1 {
   margin: 0;
   font-size: 1.25rem;
-  background: linear-gradient(135deg, var(--accent), #b794f6);
+  background: linear-gradient(135deg, var(--accent), #9A7550);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -196,11 +196,24 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   min-height: 0;
 }
 
-.editor-pane.mode-edit { grid-template-columns: 1fr; }
+.editor-pane.mode-rich,
+.editor-pane.mode-markdown,
 .editor-pane.mode-preview { grid-template-columns: 1fr; }
 .editor-pane.mode-split { grid-template-columns: 1fr 1fr; }
 
-.markdown-editor, .markdown-preview {
+.lexical-editor-host {
+  overflow: auto;
+  min-height: 0;
+  height: 100%;
+  background: radial-gradient(1200px 640px at 50% -10%, #fffdf8 0%, #f6f2e8 45%, #efe9da 100%);
+  color: #332d21;
+}
+
+.lexical-editor-host .mindbase-immersive {
+  min-height: 100%;
+}
+
+.markdown-editor, .markdown-preview, .lexical-editor-host {
   overflow: auto;
   min-height: 0;
   height: 100%;
@@ -217,9 +230,13 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   line-height: 1.6;
 }
 
-.editor-pane.mode-edit .markdown-preview,
-.editor-pane.mode-preview .markdown-editor { display: none; }
-.editor-pane.mode-edit .markdown-preview { border-left: none; }
+.editor-pane.mode-rich .markdown-preview,
+.editor-pane.mode-rich .markdown-editor,
+.editor-pane.mode-markdown .markdown-preview,
+.editor-pane.mode-markdown .lexical-editor-host,
+.editor-pane.mode-preview .markdown-editor,
+.editor-pane.mode-preview .lexical-editor-host { display: none; }
+.editor-pane.mode-rich .markdown-preview { border-left: none; }
 
 .markdown-preview h1, .markdown-preview h2, .markdown-preview h3 { margin-top: 1.2em; }
 .markdown-preview pre {

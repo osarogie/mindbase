@@ -1,0 +1,118 @@
+# https://taskfile.dev — run `go tool task --list` (or `task --list` if installed globally)
+version: '3'
+
+vars:
+  VAULT: ./vault
+  ADDR: :8780
+
+tasks:
+  default:
+    desc: List available tasks
+    cmds:
+      - go tool task --list
+
+  tools:
+    desc: Verify pinned Go dev tools (templ, air, task)
+    cmds:
+      - go mod download
+      - echo "Go tools:"
+      - go tool templ version
+      - go tool air -v
+      - go tool task --version
+
+  templ:
+    desc: Regenerate internal/ui/templates/*_templ.go
+    cmds:
+      - go tool templ generate ./internal/ui/templates/...
+
+  bun-install:
+    desc: Install Bun workspace dependencies
+    cmds:
+      - bun install
+
+  editor-ui:
+    desc: Build Lexical editor bundle
+    deps: [bun-install]
+    cmds:
+      - bun run editor-ui:build
+
+  ui-css:
+    desc: Compile templ UI Tailwind CSS
+    deps: [bun-install]
+    cmds:
+      - bun run ui-css
+
+  react-ui:
+    desc: Build React web UI and copy into internal/webui/dist
+    deps: [bun-install]
+    cmds:
+      - bun run web:build
+      - rm -rf internal/webui/dist
+      - cp -R web/dist internal/webui/dist
+
+  build:
+    desc: Build bin/mindbase (templ, editor-ui, ui-css, react-ui)
+    deps: [templ, editor-ui, ui-css, react-ui]
+    cmds:
+      - go build -o bin/mindbase ./cmd/mindbase
+
+  run:
+    desc: Build and run server on {{.ADDR}}
+    deps: [build]
+    cmds:
+      - ./bin/mindbase -vault {{.VAULT}} -addr {{.ADDR}}
+
+  run-templ:
+    desc: Run server with templ UI
+    deps: [build]
+    cmds:
+      - ./bin/mindbase -vault {{.VAULT}} -addr {{.ADDR}} -ui templ
+
+  run-react:
+    desc: Build React UI and run server
+    deps: [react-ui]
+    cmds:
+      - go build -o bin/mindbase ./cmd/mindbase
+      - ./bin/mindbase -vault {{.VAULT}} -addr {{.ADDR}} -ui react
+
+  dev:
+    desc: Hot reload with air (http://localhost:8090)
+    cmds:
+      - go tool air
+
+  cli:
+    desc: Build bin/mind CLI
+    cmds:
+      - go build -o bin/mind ./cmd/mind
+
+  install-cli:
+    desc: Install mind/mindbase CLI to ~/.local/bin
+    deps: [cli]
+    cmds:
+      - mkdir -p "$HOME/.local/bin"
+      - install -m 755 bin/mind "$HOME/.local/bin/mind"
+      - ln -sf mind "$HOME/.local/bin/mindbase" || cp bin/mind "$HOME/.local/bin/mindbase"
+      - echo "Installed mind + mindbase (CLI) to $HOME/.local/bin"
+
+  libmindbase:
+    desc: Build C shared library for native targets
+    cmds:
+      - chmod +x scripts/build-libmindbase.sh
+      - ./scripts/build-libmindbase.sh
+
+  desktop:
+    desc: Build macOS app
+    deps: [libmindbase]
+    cmds:
+      - chmod +x macos/scripts/*.sh
+      - ./macos/scripts/build-app.sh
+
+  icons:
+    desc: Generate app icons
+    cmds:
+      - node scripts/generate-icons.mjs
+
+  clean:
+    desc: Remove build artifacts and node_modules
+    cmds:
+      - rm -rf bin/mind bin/mindbase tmp web/dist node_modules mobile/node_modules macos/build web/node_modules bun.lock

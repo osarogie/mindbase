@@ -102,6 +102,19 @@ type DatabasePage struct {
 	Content string
 }
 
+type SettingsPage struct {
+	VaultName       string
+	VaultPath       string
+	PageCount       int
+	DatabaseCount   int
+	OpenTaskCount   int
+	AppVersion      string
+	AutoSync        bool
+	SyncIntervalMin int
+	SyncSource      string
+	SyncSink        string
+}
+
 type PageData struct {
 	VaultName      string
 	View           string
@@ -118,6 +131,7 @@ type PageData struct {
 	Results    []SearchResult
 	Note       *NotePage
 	Database   *DatabasePage
+	Settings   *SettingsPage
 	Connectors connectors.Status
 }
 
@@ -128,6 +142,9 @@ func MainContent(data PageData) templ.Component {
 	}
 	if data.View == "connectors" {
 		return ConnectorsPanel(data.Connectors)
+	}
+	if data.View == "settings" && data.Settings != nil {
+		return SettingsPanel(*data.Settings)
 	}
 	if data.Note != nil {
 		return MarkdownDocumentEditor("note", data.Note.Path, data.Note.Title, data.Note.Content, data.Note)

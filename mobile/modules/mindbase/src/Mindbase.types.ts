@@ -19,9 +19,11 @@ export interface DatabaseEntry {
   modified: string;
 }
 
+export type VaultItemKind = 'note' | 'database' | 'image' | 'pdf' | 'epub' | 'csv';
+
 export interface VaultItem {
   id: string;
-  kind: 'note' | 'database';
+  kind: VaultItemKind;
   title: string;
   subtitle: string;
   path: string;
@@ -92,4 +94,42 @@ export interface SearchResult {
   title: string;
   snippet: string;
   score: number;
+}
+
+export interface OpenTask {
+  path: string;
+  note_title: string;
+  line: number;
+  text: string;
+  schedule?: string;
+  tags?: string[];
+}
+
+export interface CSVTable {
+  path: string;
+  headers: string[];
+  rows: string[][];
+}
+
+export interface FilePayload {
+  path: string;
+  mime: string;
+  base64: string;
+  size: number;
+}
+
+export interface AIChatRequest {
+  message: string;
+  note_path?: string;
+  use_vault?: boolean;
+}
+
+export interface AIChatResponse {
+  reply: string;
+  model: string;
+  tokens_saved?: number;
+  headroom_used: boolean;
+  rtk_used: boolean;
+  context_chars: number;
+  compressed_chars?: number;
 }

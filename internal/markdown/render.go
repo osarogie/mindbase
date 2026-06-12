@@ -80,7 +80,7 @@ func renderWikiToken(match string, opts RenderOptions) string {
 	if href == "" {
 		return fmt.Sprintf(`<a href="#" class="wiki-link missing" title="Create note">%s</a>`, template.HTMLEscapeString(label))
 	}
-	return fmt.Sprintf(`<a href="/notes/%s" class="wiki-link page-link" hx-get="/notes/%s" hx-target="#main" hx-push-url="true">%s</a>`,
+	return fmt.Sprintf(`<a href="/notes/%s" class="wiki-link page-link" hx-get="/notes/%s" hx-target="#main-body" hx-push-url="true">%s</a>`,
 		template.HTMLEscapeString(href),
 		template.HTMLEscapeString(href),
 		template.HTMLEscapeString(label),
@@ -304,7 +304,7 @@ func formatText(s string) string {
 			return m
 		}
 		tag := template.HTMLEscapeString(parts[1])
-		return fmt.Sprintf(`<a href="/tags/%s" class="tag-link" hx-get="/tags/%s" hx-target="#main" hx-push-url="true">#%s</a>`, tag, tag, tag)
+		return fmt.Sprintf(`<a href="/tags/%s" class="tag-link" hx-get="/tags/%s" hx-target="#main-body" hx-push-url="true">#%s</a>`, tag, tag, tag)
 	})
 	s = mentionInlineRe.ReplaceAllStringFunc(s, func(m string) string {
 		parts := mentionInlineRe.FindStringSubmatch(m)

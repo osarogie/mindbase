@@ -20,6 +20,15 @@ import (
 	uistatic "github.com/osarogie/mindbase/internal/ui/static"
 	"github.com/osarogie/mindbase/internal/vault"
 	"github.com/osarogie/mindbase/internal/watcher"
+	"github.com/osarogie/mindbase/internal/webui"
+)
+
+type UIMode string
+
+const (
+	UIAuto  UIMode = "auto"
+	UIReact UIMode = "react"
+	UITempl UIMode = "templ"
 )
 
 type Server struct {
@@ -32,7 +41,8 @@ type Server struct {
 	connectors  *connectors.Service
 	webDir      string
 	webFS       fs.FS
-	useLegacyUI bool
+	useReactUI  bool
+	uiMode      UIMode
 	runtime     RuntimeInfo
 }
 
@@ -46,11 +56,15 @@ func (s *Server) SetRuntimeInfo(info RuntimeInfo) {
 	s.runtime = info
 }
 
-func New(v *vault.Vault, webDir string) (*Server, error) {
-	return NewWithFS(v, webDir, nil)
+func (s *Server) UsesReactUI() bool {
+	return s.useReactUI
 }
 
-func NewWithFS(v *vault.Vault, webDir string, webFS fs.FS) (*Server, error) {
+func New(v *vault.Vault, mode UIMode, webDir string) (*Server, error) {
+	return NewWithFS(v, mode, webDir, nil)
+}
+
+func NewWithFS(v *vault.Vault, mode UIMode, webDir string, webFS fs.FS) (*Server, error) {
 	w, err := watcher.New(v)
 	if err != nil {
 		return nil, err
@@ -63,6 +77,7 @@ func NewWithFS(v *vault.Vault, webDir string, webFS fs.FS) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	useReact, resolvedFS, resolvedDir := resolveReactUI(mode, webDir, webFS)
 	return &Server{
 		vault:       v,
 		notes:       notes.NewService(v),
@@ -71,10 +86,40 @@ func NewWithFS(v *vault.Vault, webDir string, webFS fs.FS) (*Server, error) {
 		watcher:     w,
 		ui:          uiHandlers,
 		connectors:  connSvc,
-		webDir:      webDir,
-		webFS:       webFS,
-		useLegacyUI: webDir != "" || webFS != nil,
+		webDir:      resolvedDir,
+		webFS:       resolvedFS,
+		useReactUI:  useReact,
+		uiMode:      mode,
 	}, nil
+}
+
+func resolveReactUI(mode UIMode, webDir string, webFS fs.FS) (useReact bool, fsOut fs.FS, dir string) {
+	switch mode {
+	case UITempl:
+		return false, nil, ""
+	case UIReact:
+		if webFS != nil {
+			return true, webFS, ""
+		}
+		if webDir != "" {
+			return true, nil, webDir
+		}
+		if embedded, ok := webui.FS(); ok {
+			return true, embedded, ""
+		}
+		return false, nil, ""
+	default: // auto — prefer React when a build is available
+		if webDir != "" {
+			return true, nil, webDir
+		}
+		if webFS != nil {
+			return true, webFS, ""
+		}
+		if embedded, ok := webui.FS(); ok {
+			return true, embedded, ""
+		}
+		return false, nil, ""
+	}
 }
 
 func (s *Server) Router() http.Handler {
@@ -128,7 +173,7 @@ func (s *Server) Router() http.Handler {
 
 	r.Handle("/static/*", uistatic.Handler())
 
-	if s.useLegacyUI {
+	if s.useReactUI {
 		r.Get("/*", s.serveSPA)
 	} else {
 		s.ui.Mount(r)

@@ -19,6 +19,18 @@ struct ContentView: View {
         } message: {
             Text(appModel.errorMessage ?? "")
         }
+        .sheet(isPresented: $appModel.commandPalettePresented) {
+            CommandPaletteView()
+                .environmentObject(appModel)
+        }
+        .background {
+            Button("") {
+                appModel.commandPalettePresented = true
+            }
+            .keyboardShortcut("p", modifiers: .command)
+            .opacity(0)
+            .frame(width: 0, height: 0)
+        }
     }
 }
 
@@ -51,7 +63,7 @@ struct WelcomeView: View {
                 .font(.title)
             Text("Native SwiftUI — local vault files on disk, git-tracked.")
                 .foregroundStyle(.secondary)
-            Text("Select a note or database, or press ⌘N to create one.")
+            Text("Select a note or database, or press ⌘K for the command palette.")
                 .font(.callout)
                 .foregroundStyle(.tertiary)
         }

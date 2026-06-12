@@ -43,7 +43,8 @@ export function DatabaseGrid({
 
   const commit = useCallback(
     (nextHeaders: string[], nextRows: string[][]) => {
-      onChange(...Object.values(normalizeGrid(nextHeaders, nextRows)))
+      const next = normalizeGrid(nextHeaders, nextRows)
+      onChange(next.headers, next.rows)
     },
     [onChange],
   )

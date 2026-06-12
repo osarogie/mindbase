@@ -1,4 +1,4 @@
-import { FileText, Table2 } from 'lucide-react'
+import { FileText, Paperclip, PenLine, Table2 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 export function HomePage() {
@@ -19,8 +19,12 @@ export function HomePage() {
             <li className="flex items-center gap-2">
               <Table2 className="size-4" /> Databases stored as CSV
             </li>
-            <li>Attachments live beside each note</li>
-            <li>Rich editor powered by Lexical + shadcn/ui</li>
+            <li className="flex items-center gap-2">
+              <Paperclip className="size-4" /> Attachments live beside each note
+            </li>
+            <li className="flex items-center gap-2">
+              <PenLine className="size-4" /> Rich editor powered by Lexical + shadcn/ui
+            </li>
           </ul>
           <p className="text-sm text-muted-foreground">
             Choose a note or database from the sidebar, or create a new one.

@@ -1,15 +1,13 @@
+/*
+ * Legacy chrome styles. All colors alias the shadcn "Paper" tokens defined in
+ * index.css — do NOT redefine --border/--accent/--muted/--radius here, they
+ * collide with the shadcn :root tokens and split the app into two themes.
+ */
 :root {
-  --bg: #0f0f14;
-  --surface: #1a1a24;
-  --surface-2: #242433;
-  --border: #2e2e42;
-  --text: #e8e8f0;
-  --muted: #9898b0;
-  --accent: #6B5034;
-  --accent-hover: #5C4228;
-  --danger: #e85555;
-  --radius: 10px;
-  font-family: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --bg: var(--background);
+  --surface: var(--card);
+  --surface-2: var(--secondary);
+  --text: var(--foreground);
   color: var(--text);
   background: var(--bg);
 }
@@ -35,17 +33,18 @@ button {
 }
 
 button.primary {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-foreground);
 }
 
 button.primary:hover:not(:disabled) {
-  background: var(--accent-hover);
+  background: color-mix(in oklch, var(--primary) 85%, black);
 }
 
 button.danger {
-  color: var(--danger);
-  border-color: color-mix(in srgb, var(--danger) 40%, var(--border));
+  color: var(--destructive);
+  border-color: color-mix(in srgb, var(--destructive) 40%, var(--border));
 }
 
 button:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -85,7 +84,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .sidebar-header h1 {
   margin: 0;
   font-size: 1.25rem;
-  background: linear-gradient(135deg, var(--accent), #9A7550);
+  background: linear-gradient(135deg, var(--primary), #9A7550);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -96,15 +95,27 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   padding: 0.75rem;
 }
 
+.view-tabs a,
 .view-tabs button {
   flex: 1;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.4rem;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
   background: transparent;
+  color: var(--text);
+  text-decoration: none;
 }
 
+.view-tabs a.active,
 .view-tabs button.active {
   background: var(--surface-2);
-  border-color: var(--accent);
+  border-color: var(--primary);
 }
 
 .new-btn {
@@ -136,7 +147,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 
 .item-list span { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.item-list small { color: var(--muted); font-size: 0.75rem; }
+.item-list small { color: var(--muted-foreground); font-size: 0.75rem; }
 
 .main {
   flex: 1;
@@ -144,15 +155,6 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   flex-direction: column;
   overflow: hidden;
   position: relative;
-}
-
-.vault-badge {
-  position: absolute;
-  top: 0.5rem;
-  right: 0.75rem;
-  font-size: 0.75rem;
-  color: var(--muted);
-  z-index: 1;
 }
 
 .content-header {
@@ -177,10 +179,10 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   gap: 0.5rem;
 }
 
-.status { color: var(--muted); font-size: 0.85rem; }
+.status { color: var(--muted-foreground); font-size: 0.85rem; }
 
 .mode-toggle button { padding: 0.35rem 0.5rem; }
-.mode-toggle button.active { border-color: var(--accent); }
+.mode-toggle button.active { border-color: var(--primary); }
 
 .note-view, .database-view {
   display: flex;
@@ -273,7 +275,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 
 .excalidraw-error {
-  color: var(--danger);
+  color: var(--destructive);
   padding: 1rem;
   background: var(--surface-2);
   border-radius: var(--radius);
@@ -290,7 +292,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .attachments-panel h3 {
   margin: 0 0 0.5rem;
   font-size: 0.85rem;
-  color: var(--muted);
+  color: var(--muted-foreground);
 }
 
 .attachments-panel ul {
@@ -306,7 +308,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   font-size: 0.9rem;
 }
 
-.attachments-panel a { color: var(--accent-hover); }
+.attachments-panel a { color: color-mix(in oklch, var(--primary) 85%, black); }
 
 .database-editor {
   flex: 1;
@@ -351,7 +353,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: var(--muted);
+  color: var(--muted-foreground);
   padding: 2rem;
   text-align: center;
 }
@@ -364,15 +366,16 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   display: none;
   position: fixed;
   bottom: 1rem;
-  left: 1rem;
+  right: 1rem;
   z-index: 20;
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-foreground);
   border-radius: 50%;
   width: 48px;
   height: 48px;
   justify-content: center;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.25);
 }
 
 @media (max-width: 768px) {
@@ -395,7 +398,6 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   .menu-btn { display: inline-flex; }
   .editor-pane.mode-split { grid-template-columns: 1fr; }
   .editor-pane.mode-split .markdown-preview { display: none; }
-  .vault-badge { display: none; }
 }
 
 @media (max-width: 480px) {

@@ -42,6 +42,15 @@ describe('ImageNode', () => {
       expect(node.getSrc()).toBe('x.attachments/pending.png')
     }, { discrete: true })
   })
+
+  it('importJSON uses defensive defaults for missing fields', () => {
+    const editor = makeEditor()
+    editor.update(() => {
+      const node = ImageNode.importJSON({ type: 'mb-image', version: 1 } as never)
+      expect(node.getSrc()).toBe('')
+      expect(node.getAlt()).toBe('')
+    }, { discrete: true })
+  })
 })
 
 describe('FileCardNode', () => {
@@ -59,6 +68,14 @@ describe('FileCardNode', () => {
       const p = $createParagraphNode()
       p.append(node)
       $getRoot().append(p)
+    }, { discrete: true })
+  })
+
+  it('importJSON uses defensive defaults for missing fields', () => {
+    const editor = makeEditor()
+    editor.update(() => {
+      const node = FileCardNode.importJSON({ type: 'mb-file-card', version: 1 } as never)
+      expect(node.getLabel()).toBe('')
     }, { discrete: true })
   })
 })

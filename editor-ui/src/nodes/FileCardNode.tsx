@@ -33,7 +33,7 @@ export class FileCardNode extends DecoratorNode<JSX.Element> {
   }
 
   static importJSON(json: SerializedFileCardNode): FileCardNode {
-    return new FileCardNode(json.src, json.label)
+    return new FileCardNode(json.src ?? '', json.label ?? '')
   }
 
   constructor(src: string, label: string, key?: NodeKey) {

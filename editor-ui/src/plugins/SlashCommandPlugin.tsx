@@ -8,6 +8,7 @@ import {
 } from '@lexical/react/LexicalTypeaheadMenuPlugin'
 import type { TextNode } from 'lexical'
 import { runSlashCommand } from '../editorCommands'
+import { OPEN_ATTACHMENT_PICKER_COMMAND } from './AttachmentPickerPlugin'
 import { filterSlashCommands, slashCommandsFor, type SlashCommand, type SlashDocumentKind } from '../slashCommands'
 
 class SlashMenuOption extends MenuOption {
@@ -101,7 +102,11 @@ export function SlashCommandPlugin({ documentKind = 'note' }: Props) {
           }
         }
       })
-      runSlashCommand(editor, selectedOption.command)
+      if (selectedOption.command.picker) {
+        editor.dispatchCommand(OPEN_ATTACHMENT_PICKER_COMMAND, undefined)
+      } else {
+        runSlashCommand(editor, selectedOption.command)
+      }
       closeMenu()
     },
     [editor],

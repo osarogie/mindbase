@@ -10,6 +10,8 @@ export interface SlashCommand {
   insert?: string
   /** Structured block handled by editorCommands. */
   block?: string
+  /** Opens the attachment picker (handled by AttachmentPickerPlugin). */
+  picker?: boolean
 }
 
 const COMMON: SlashCommand[] = [
@@ -31,7 +33,8 @@ const COMMON: SlashCommand[] = [
     insert: '\n| col | col |\n| --- | --- |\n| | |\n',
   },
   { id: 'link', label: 'Link', hint: '[text](url)', icon: '↗', keywords: ['link', 'url', 'href'], insert: '[label](https://)' },
-  { id: 'image', label: 'Image', hint: 'Markdown image', icon: '🖼', keywords: ['image', 'img', 'photo'], insert: '![alt](path/to/image.png)' },
+  { id: 'image', label: 'Image', hint: 'Embed an image', icon: '🖼', keywords: ['image', 'img', 'photo'], picker: true },
+  { id: 'attachment', label: 'Attachment', hint: 'Embed a file', icon: '📎', keywords: ['attachment', 'file', 'upload', 'pdf'], picker: true },
   { id: 'callout', label: 'Callout', hint: 'Highlighted note', icon: '💡', keywords: ['callout', 'note', 'tip'], insert: '> **Note:** ' },
   {
     id: 'frontmatter',

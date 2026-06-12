@@ -1,21 +1,29 @@
 import type { EditorConfig, LexicalNode, NodeKey, SerializedLexicalNode, Spread } from 'lexical'
 import { DecoratorNode } from 'lexical'
 import type { JSX } from 'react'
-import { resolveSrc, useAttachmentHost } from '../attachments/host'
+import { attachmentFilename, resolveSrc, useAttachmentHost } from '../attachments/host'
 
-export type SerializedFileCardNode = Spread<{ src: string; label: string }, SerializedLexicalNode>
+export type SerializedFileCardNode = Spread<{ src: string; label: string; title: string }, SerializedLexicalNode>
 
-function FileCardComponent({ src, label }: { src: string; label: string }) {
+function FileCardComponent({ src, label, title }: { src: string; label: string; title: string }) {
   const host = useAttachmentHost()
   if (!src) {
     return <span className="mb-attachment-pending">Uploading {label || 'file'}…</span>
   }
   return (
-    <a className="mb-file-card" href={resolveSrc(host, src)} target="_blank" rel="noreferrer">
+    <a
+      className="mb-file-card"
+      href={resolveSrc(host, src)}
+      title={title || undefined}
+      target="_blank"
+      rel="noreferrer"
+    >
       <span className="mb-file-card-icon" aria-hidden>
         📎
       </span>
-      <span className="mb-file-card-label">{label}</span>
+      {/* Display-only fallback: an empty label stays '' in the node so the
+          markdown round-trips byte-identically, but we still show a name. */}
+      <span className="mb-file-card-label">{label || attachmentFilename(src)}</span>
     </a>
   )
 }
@@ -23,27 +31,29 @@ function FileCardComponent({ src, label }: { src: string; label: string }) {
 export class FileCardNode extends DecoratorNode<JSX.Element> {
   __src: string
   __label: string
+  __title: string
 
   static getType(): string {
     return 'mb-file-card'
   }
 
   static clone(node: FileCardNode): FileCardNode {
-    return new FileCardNode(node.__src, node.__label, node.__key)
+    return new FileCardNode(node.__src, node.__label, node.__title, node.__key)
   }
 
   static importJSON(json: SerializedFileCardNode): FileCardNode {
-    return new FileCardNode(json.src ?? '', json.label ?? '')
+    return new FileCardNode(json.src ?? '', json.label ?? '', json.title ?? '')
   }
 
-  constructor(src: string, label: string, key?: NodeKey) {
+  constructor(src: string, label: string, title = '', key?: NodeKey) {
     super(key)
     this.__src = src
     this.__label = label
+    this.__title = title
   }
 
   exportJSON(): SerializedFileCardNode {
-    return { type: 'mb-file-card', version: 1, src: this.getSrc(), label: this.getLabel() }
+    return { type: 'mb-file-card', version: 1, src: this.getSrc(), label: this.getLabel(), title: this.getTitle() }
   }
 
   createDOM(_config: EditorConfig): HTMLElement {
@@ -68,6 +78,10 @@ export class FileCardNode extends DecoratorNode<JSX.Element> {
     return this.getLatest().__label
   }
 
+  getTitle(): string {
+    return this.getLatest().__title
+  }
+
   setSrc(src: string): void {
     this.getWritable().__src = src
   }
@@ -77,12 +91,12 @@ export class FileCardNode extends DecoratorNode<JSX.Element> {
   }
 
   decorate(): JSX.Element {
-    return <FileCardComponent src={this.getSrc()} label={this.getLabel()} />
+    return <FileCardComponent src={this.getSrc()} label={this.getLabel()} title={this.getTitle()} />
   }
 }
 
-export function $createFileCardNode(src: string, label: string): FileCardNode {
-  return new FileCardNode(src, label)
+export function $createFileCardNode(src: string, label = '', title = ''): FileCardNode {
+  return new FileCardNode(src, label, title)
 }
 
 export function $isFileCardNode(node: LexicalNode | null | undefined): node is FileCardNode {

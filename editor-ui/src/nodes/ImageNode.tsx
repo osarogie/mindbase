@@ -3,9 +3,9 @@ import { DecoratorNode } from 'lexical'
 import type { JSX } from 'react'
 import { resolveSrc, useAttachmentHost } from '../attachments/host'
 
-export type SerializedImageNode = Spread<{ src: string; alt: string }, SerializedLexicalNode>
+export type SerializedImageNode = Spread<{ src: string; alt: string; title: string }, SerializedLexicalNode>
 
-function ImageComponent({ src, alt }: { src: string; alt: string }) {
+function ImageComponent({ src, alt, title }: { src: string; alt: string; title: string }) {
   const host = useAttachmentHost()
   if (!src) {
     return <span className="mb-attachment-pending">Uploading {alt || 'file'}…</span>
@@ -15,6 +15,7 @@ function ImageComponent({ src, alt }: { src: string; alt: string }) {
       className="mb-embed-image"
       src={resolveSrc(host, src)}
       alt={alt}
+      title={title || undefined}
       loading="lazy"
       onError={(e) => (e.target as HTMLImageElement).classList.add('mb-embed-image-broken')}
     />
@@ -24,27 +25,29 @@ function ImageComponent({ src, alt }: { src: string; alt: string }) {
 export class ImageNode extends DecoratorNode<JSX.Element> {
   __src: string
   __alt: string
+  __title: string
 
   static getType(): string {
     return 'mb-image'
   }
 
   static clone(node: ImageNode): ImageNode {
-    return new ImageNode(node.__src, node.__alt, node.__key)
+    return new ImageNode(node.__src, node.__alt, node.__title, node.__key)
   }
 
   static importJSON(json: SerializedImageNode): ImageNode {
-    return new ImageNode(json.src ?? '', json.alt ?? '')
+    return new ImageNode(json.src ?? '', json.alt ?? '', json.title ?? '')
   }
 
-  constructor(src: string, alt: string, key?: NodeKey) {
+  constructor(src: string, alt: string, title = '', key?: NodeKey) {
     super(key)
     this.__src = src
     this.__alt = alt
+    this.__title = title
   }
 
   exportJSON(): SerializedImageNode {
-    return { type: 'mb-image', version: 1, src: this.getSrc(), alt: this.getAlt() }
+    return { type: 'mb-image', version: 1, src: this.getSrc(), alt: this.getAlt(), title: this.getTitle() }
   }
 
   createDOM(_config: EditorConfig): HTMLElement {
@@ -69,6 +72,10 @@ export class ImageNode extends DecoratorNode<JSX.Element> {
     return this.getLatest().__alt
   }
 
+  getTitle(): string {
+    return this.getLatest().__title
+  }
+
   setSrc(src: string): void {
     this.getWritable().__src = src
   }
@@ -78,12 +85,12 @@ export class ImageNode extends DecoratorNode<JSX.Element> {
   }
 
   decorate(): JSX.Element {
-    return <ImageComponent src={this.getSrc()} alt={this.getAlt()} />
+    return <ImageComponent src={this.getSrc()} alt={this.getAlt()} title={this.getTitle()} />
   }
 }
 
-export function $createImageNode(src: string, alt = ''): ImageNode {
-  return new ImageNode(src, alt)
+export function $createImageNode(src: string, alt = '', title = ''): ImageNode {
+  return new ImageNode(src, alt, title)
 }
 
 export function $isImageNode(node: LexicalNode | null | undefined): node is ImageNode {

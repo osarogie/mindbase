@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -90,6 +91,22 @@ func Show(root, rev string) (string, error) {
 		return "", fmt.Errorf("commit required")
 	}
 	return gitOutput(root, "show", "--stat", "--patch", rev)
+}
+
+// FileAtRev returns file contents at a specific commit.
+func FileAtRev(root, rev, relPath string) (string, error) {
+	if _, err := exec.LookPath("git"); err != nil {
+		return "", fmt.Errorf("git not installed")
+	}
+	if !HasRepo(root) {
+		return "", fmt.Errorf("vault is not a git repository")
+	}
+	rev = strings.TrimSpace(rev)
+	relPath = strings.TrimSpace(filepath.ToSlash(relPath))
+	if rev == "" || relPath == "" {
+		return "", fmt.Errorf("rev and path required")
+	}
+	return gitOutput(root, "show", rev+":"+relPath)
 }
 
 // Diff returns diff output for the working tree or a commit range.

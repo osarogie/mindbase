@@ -92,6 +92,8 @@ func (s *Server) Router() http.Handler {
 	r.Post("/api/debug/client-log", s.handleClientDebugLog)
 	r.Get("/api/vault", s.handleVaultInfo)
 	r.Get("/api/search", s.handleAPISearch)
+	r.Get("/api/history", s.handleHistoryLog)
+	r.Get("/api/history/{rev}", s.handleHistorySnapshot)
 
 	r.Route("/api/notes", func(r chi.Router) {
 		r.Get("/", s.handleListNotes)

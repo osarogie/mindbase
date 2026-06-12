@@ -51,7 +51,10 @@ The Go server powers the **web client** only. Run it when you want the browser U
 
 ```bash
 make build && make run
-# → http://localhost:8080
+# → http://localhost:8780
+
+make dev
+# → http://localhost:8090 (hot reload)
 ```
 
 Connector sync is **on-demand** (`POST /api/connectors/sync`) — no background daemon.
@@ -96,8 +99,8 @@ cp vault/.mindbase/env.example ~/.mindbase/env
 ```
 
 **SSO:** Save a Google OAuth client JSON in the UI, then click **Sign in with Google**. For Notion OAuth, save client ID/secret then **Sign in with Notion**. Register redirect URIs in each provider console:
-- `http://127.0.0.1:8080/api/connectors/gdrive/oauth/callback`
-- `http://127.0.0.1:8080/api/connectors/notion/oauth/callback`
+- `http://127.0.0.1:8780/api/connectors/gdrive/oauth/callback`
+- `http://127.0.0.1:8780/api/connectors/notion/oauth/callback`
 (use your actual mindbase port if different)
 
 # Optional: Headroom proxy for 60–90% token savings on AI calls
@@ -134,7 +137,8 @@ Connector config is stored at `vault/.mindbase/connectors.json` (env var names o
 ```bash
 make tools            # verify pinned Go tools (air, templ)
 make dev              # hot reload with air → http://localhost:8090
-make run              # production binary → http://localhost:8080
+make run              # production binary → http://localhost:8780
+make dev              # hot reload → http://localhost:8090
 make cli              # agent CLI → bin/mind
 make install-cli      # install mind to ~/.local/bin
 ```

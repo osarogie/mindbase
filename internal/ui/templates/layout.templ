@@ -352,6 +352,7 @@ templ MarkdownDocumentEditor(kind, path, title, content string, note *NotePage) 
 				}
 			</div>
 			<div class="header-actions">
+				<button type="button" class="ghost-btn" @click="toggleHistory()" title="Version history">History</button>
 				if kind == "note" {
 					<button type="button" class="ai-trigger" @click="$dispatch('open-ai')" title="Ask Claude">✦ AI</button>
 				}
@@ -384,6 +385,34 @@ templ MarkdownDocumentEditor(kind, path, title, content string, note *NotePage) 
 						@NoteMetaPanel(*note)
 					}
 					<div class="editor-pane" :class="'mode-' + mode">
+						<aside class="history-panel" x-show="historyOpen" x-cloak @click.outside="historyOpen=false">
+							<div class="history-panel-header">
+								<h3>Version history</h3>
+								<button type="button" class="icon-btn" @click="historyOpen=false">✕</button>
+							</div>
+							<p class="history-empty muted" x-show="historyLoading">Loading…</p>
+							<p class="history-empty muted" x-show="!historyLoading && historyCommits.length === 0">No saved versions yet — edits commit on save.</p>
+							<ul class="history-list" x-show="historyCommits.length > 0">
+								<template x-for="c in historyCommits" :key="c.hash">
+									<li>
+										<button type="button" class="history-item" @click="previewHistory(c)">
+											<span class="history-subject" x-text="c.subject"></span>
+											<span class="history-meta">
+												<code x-text="c.short"></code>
+												<span x-text="formatHistoryDate(c.date)"></span>
+											</span>
+										</button>
+									</li>
+								</template>
+							</ul>
+							<div class="history-preview" x-show="historyPreview">
+								<div class="history-preview-header">
+									<strong x-text="historyPreviewLabel"></strong>
+									<button type="button" class="primary" @click="restoreHistory()">Restore</button>
+								</div>
+								<pre x-text="historyPreview"></pre>
+							</div>
+						</aside>
 						<div class="editor-wrap rich-editor-wrap" x-show="mode !== 'preview'">
 							<div class="slash-menu notion-slash" x-show="showSlash" x-cloak @click.outside="closeSlash()">
 								<div class="slash-menu-header">Commands</div>

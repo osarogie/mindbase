@@ -69,3 +69,41 @@ func TestFormatCommitOneline(t *testing.T) {
 		t.Fatal("empty oneline")
 	}
 }
+
+func TestFileAtRev(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not installed")
+	}
+	root := t.TempDir()
+	notePath := filepath.Join(root, "notes", "alpha.md")
+	if err := os.MkdirAll(filepath.Dir(notePath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(notePath, []byte("# v1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := Ensure(root); err != nil {
+		t.Fatal(err)
+	}
+	if err := Track(root, []string{NotePath("alpha.md")}, "v1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(notePath, []byte("# v2\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := Track(root, []string{NotePath("alpha.md")}, "v2"); err != nil {
+		t.Fatal(err)
+	}
+	commits, err := Log(root, LogOptions{Limit: 2})
+	if err != nil || len(commits) < 2 {
+		t.Fatalf("log: err=%v n=%d", err, len(commits))
+	}
+	oldRev := commits[1].Short
+	content, err := FileAtRev(root, oldRev, NotePath("alpha.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if content != "# v1\n" {
+		t.Fatalf("content = %q", content)
+	}
+}

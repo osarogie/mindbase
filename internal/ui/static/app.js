@@ -36,6 +36,10 @@ const SLASH_COMMANDS = {
     { id: 'code', label: 'Code block', hint: 'Fenced code', icon: '</>', keywords: ['code', 'snippet'], insert: '```\n\n```', exec: (ed) => ed.exec('codeBlock') },
     { id: 'divider', label: 'Divider', hint: 'Horizontal rule', icon: '—', keywords: ['divider', 'hr', 'line'], insert: '---\n', exec: (ed) => ed.exec('hr') },
     { id: 'table', label: 'Table', hint: 'Markdown table', icon: '⊞', keywords: ['table', 'grid'], insert: '| col | col |\n| --- | --- |\n| | |\n', exec: (ed) => ed.exec('table') },
+    { id: 'link', label: 'Link', hint: '[text](url)', icon: '↗', keywords: ['link', 'url', 'href'], insert: '[label](https://)\n' },
+    { id: 'image', label: 'Image', hint: 'Markdown image', icon: '🖼', keywords: ['image', 'img', 'photo'], insert: '![alt](path/to/image.png)\n' },
+    { id: 'callout', label: 'Callout', hint: 'Highlighted note', icon: '💡', keywords: ['callout', 'note', 'tip'], insert: '> **Note:** \n' },
+    { id: 'frontmatter', label: 'Frontmatter', hint: 'YAML metadata', icon: 'fm', keywords: ['yaml', 'frontmatter', 'meta'], insert: '---\ntitle: \ntags: []\n---\n\n' },
   ],
   note: [
     { id: 'scheduled', label: 'Scheduled task', hint: '>today #tag', icon: '◷', keywords: ['schedule', 'today'], insert: '- [ ] Task >today #project\n' },
@@ -64,6 +68,12 @@ document.addEventListener('alpine:init', () => {
     slashIndex: 0,
     slashActive: false,
     dirty: false,
+    historyOpen: false,
+    historyLoading: false,
+    historyCommits: [],
+    historyPreview: '',
+    historyPreviewLabel: '',
+    historyPreviewRev: '',
 
     init() {
       this.documentKind = this.$el.dataset.documentKind || 'note'
@@ -103,6 +113,66 @@ document.addEventListener('alpine:init', () => {
         return `/databases/${this.documentPath}`
       }
       return `/notes/${this.documentPath}`
+    },
+
+    gitPath() {
+      if (this.documentKind === 'database') {
+        const p = this.documentPath.replace(/\.csv$/i, '')
+        return `databases/${p}.csv`
+      }
+      return `notes/${this.documentPath}`
+    },
+
+    async toggleHistory() {
+      this.historyOpen = !this.historyOpen
+      if (this.historyOpen && this.historyCommits.length === 0) {
+        await this.loadHistory()
+      }
+    },
+
+    async loadHistory() {
+      this.historyLoading = true
+      try {
+        const res = await fetch(`/api/history?path=${encodeURIComponent(this.gitPath())}&limit=40`)
+        if (!res.ok) throw new Error('history failed')
+        const data = await res.json()
+        this.historyCommits = data.commits || []
+      } catch {
+        this.historyCommits = []
+      } finally {
+        this.historyLoading = false
+      }
+    },
+
+    formatHistoryDate(iso) {
+      try {
+        return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+      } catch {
+        return iso || ''
+      }
+    },
+
+    async previewHistory(commit) {
+      try {
+        const res = await fetch(`/api/history/${encodeURIComponent(commit.short)}?path=${encodeURIComponent(this.gitPath())}`)
+        if (!res.ok) throw new Error('snapshot failed')
+        const data = await res.json()
+        this.historyPreview = data.content || ''
+        this.historyPreviewRev = commit.short
+        this.historyPreviewLabel = `${commit.short} · ${commit.subject}`
+      } catch {
+        this.historyPreview = ''
+        this.historyPreviewLabel = 'Could not load version'
+      }
+    },
+
+    restoreHistory() {
+      if (!this.historyPreview) return
+      this.setMarkdown(this.historyPreview)
+      this.onEditorInput()
+      this.dirty = true
+      this.historyOpen = false
+      this.saveStatus = 'Restored — save to commit'
     },
 
     editorMountEl() {

@@ -1,5 +1,6 @@
 import type { TextMatchTransformer } from '@lexical/markdown'
 import { TRANSFORMERS } from '@lexical/markdown'
+import { ATTACHMENT_EMBED } from './attachmentTransformer'
 import {
   $createMentionNode,
   $createScheduleNode,
@@ -117,4 +118,4 @@ export const SCHEDULE: TextMatchTransformer = {
 }
 
 /** Standard GFM + Mindbase wiki links, tags, mentions, schedules. */
-export const MINDBASE_TRANSFORMERS = [...TRANSFORMERS, WIKI_LINK, TAG, MENTION, SCHEDULE]
+export const MINDBASE_TRANSFORMERS = [ATTACHMENT_EMBED, ...TRANSFORMERS, WIKI_LINK, TAG, MENTION, SCHEDULE]

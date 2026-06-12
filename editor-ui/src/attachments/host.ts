@@ -22,30 +22,70 @@ export function isImagePath(path: string): boolean {
   return IMAGE_EXTENSIONS.has(clean.slice(dot + 1).toLowerCase())
 }
 
+/**
+ * Extract the on-disk filename from a markdown src value.
+ *
+ * Strips the directory prefix and any `?query`/`#hash` suffix, then
+ * percent-decodes the result so callers receive the human-readable filename
+ * (e.g. `"Shot 1.png"` rather than `"Shot%201.png"`).
+ *
+ * Returns the raw segment unchanged if `decodeURIComponent` throws (e.g.
+ * a literal lone `%` that is not valid percent-encoding).
+ */
 export function attachmentFilename(src: string): string {
   const clean = src.split(/[?#]/)[0]
-  return clean.split('/').pop() ?? clean
+  const segment = clean.split('/').pop() ?? clean
+  try {
+    return decodeURIComponent(segment)
+  } catch {
+    return segment
+  }
 }
 
-/** "journal/x.md" + "photo.png" → "x.attachments/photo.png" (sibling-relative, portable). */
+/**
+ * Build the sibling-relative markdown path for a new attachment.
+ *
+ * The filename segment is percent-encoded with `encodeURIComponent` so that
+ * the resulting link target is valid CommonMark even when the filename
+ * contains spaces or other special characters.
+ *
+ * Example: `attachmentMarkdownPath('welcome.md', 'Shot 1.png')`
+ *          → `'welcome.attachments/Shot%201.png'`
+ */
 export function attachmentMarkdownPath(notePath: string, filename: string): string {
   const noteFile = notePath.split('/').pop() ?? notePath
   const base = noteFile.replace(/\.[^.]+$/, '')
-  return `${base}.attachments/${filename}`
+  return `${base}.attachments/${encodeURIComponent(filename)}`
 }
 
-/** Resolve a markdown src (sibling-relative or legacy bare filename) to the server URL. */
+/**
+ * Resolve a markdown src (sibling-relative or legacy bare filename) to the
+ * server API URL.
+ *
+ * The filename segment in the returned URL is always percent-encoded exactly
+ * once: `attachmentFilename` decodes whatever encoding the `src` carries, and
+ * `encodeURIComponent` re-encodes it uniformly.
+ *
+ * Example: `resolveApiUrl('welcome.md', 'welcome.attachments/Shot%201.png')`
+ *          → `'/api/files/welcome.md/Shot%201.png'`
+ */
 export function resolveApiUrl(notePath: string, src: string): string {
-  return `/api/files/${notePath}/${attachmentFilename(src)}`
+  return `/api/files/${notePath}/${encodeURIComponent(attachmentFilename(src))}`
 }
 
 export const AttachmentHostContext = createContext<AttachmentHost | null>(null)
+
+declare global {
+  interface Window {
+    mindbaseAttachmentHost?: AttachmentHost
+  }
+}
 
 /** Context host (web) falls back to a bridge-registered host (WebView shells). */
 export function useAttachmentHost(): AttachmentHost | null {
   const fromContext = useContext(AttachmentHostContext)
   if (fromContext) return fromContext
-  return (window as Window & { mindbaseAttachmentHost?: AttachmentHost }).mindbaseAttachmentHost ?? null
+  return window.mindbaseAttachmentHost ?? null
 }
 
 /** Absolute/external sources pass through; vault-relative sources go through the host. */

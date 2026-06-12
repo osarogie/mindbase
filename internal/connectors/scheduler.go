@@ -112,24 +112,16 @@ func (s *Service) SyncAll(ctx context.Context) (*AllSyncResult, error) {
 	_ = ctx
 	LoadEnvFiles(s.vault)
 	s.config, _ = applyCredentialDefaults(s.vault, s.config)
+	cfg := normalizeSourceSink(s.config)
 	creds := resolveCredentials(s.vault, s.config)
 
 	out := &AllSyncResult{}
-	// #region agent log
-	agentLog("scheduler.go:SyncAll", "sync start", "H2", map[string]any{
-		"notion_enabled": s.config.Notion.Enabled,
-		"gdrive_enabled": s.config.GDrive.Enabled,
-		"auto_sync":      s.config.AutoSync,
-		"notion_token":   creds.NotionToken != "",
-		"gdrive_cred":    creds.GDriveCredJSON != "",
-	})
-	// #endregion
 
 	store := cache.New(s.vault)
 	idx, _ := store.Load()
 	out.Cache = store.Stats(idx)
 
-	if s.config.Notion.Enabled && creds.NotionToken != "" {
+	if cfg.Source == ConnectorNotion && creds.NotionToken != "" {
 		subdir := s.config.Notion.ImportDir
 		if subdir == "" {
 			subdir = "notion"
@@ -148,8 +140,8 @@ func (s *Service) SyncAll(ctx context.Context) (*AllSyncResult, error) {
 		}
 	}
 
-	if s.config.GDrive.Enabled && creds.GDriveCredJSON != "" {
-		res, err := gdrive.SyncBidirectionalJSON(
+	if cfg.Source == ConnectorGDrive && creds.GDriveCredJSON != "" {
+		res, err := gdrive.SyncPullJSON(
 			s.vault, store,
 			creds.GDriveCredJSON,
 			creds.GDriveTokenJSON,
@@ -160,45 +152,47 @@ func (s *Service) SyncAll(ctx context.Context) (*AllSyncResult, error) {
 		if err != nil {
 			out.GDrive = &GDriveSyncSummary{Error: err.Error()}
 		} else {
-			out.GDrive = &GDriveSyncSummary{
-				Uploaded:   res.Uploaded,
-				Updated:    res.Updated,
-				Downloaded: res.Downloaded,
-			}
-			if res.Paths != nil && s.config.GDrive.FolderID == "" {
-				if idx2, err := store.Load(); err == nil {
-					s.config.GDrive.FolderID = idx2.GDrive.FolderID
-				}
-			}
+			out.GDrive = &GDriveSyncSummary{Downloaded: res.Downloaded}
 			s.config.GDrive.LastSync = time.Now().UTC()
 		}
 	}
 
+	if cfg.Sink == ConnectorGDrive && creds.GDriveCredJSON != "" {
+		res, err := gdrive.SyncPushJSON(
+			s.vault, store,
+			creds.GDriveCredJSON,
+			creds.GDriveTokenJSON,
+			s.config.GDrive.FolderID,
+			s.config.GDrive.MirrorNotes,
+			s.config.GDrive.MirrorDatabases,
+		)
+		if err != nil {
+			if out.GDrive == nil {
+				out.GDrive = &GDriveSyncSummary{Error: err.Error()}
+			} else {
+				out.GDrive.Error = err.Error()
+			}
+		} else if out.GDrive == nil {
+			out.GDrive = &GDriveSyncSummary{
+				Uploaded: res.Uploaded,
+				Updated:  res.Updated,
+			}
+		} else {
+			out.GDrive.Uploaded = res.Uploaded
+			out.GDrive.Updated = res.Updated
+		}
+		if res.Paths != nil && s.config.GDrive.FolderID == "" {
+			if idx2, err := store.Load(); err == nil {
+				s.config.GDrive.FolderID = idx2.GDrive.FolderID
+			}
+		}
+		s.config.GDrive.LastSync = time.Now().UTC()
+	}
+
+	s.config = normalizeSourceSink(s.config)
 	_ = Save(s.vault, s.config)
 	if idx2, err := store.Load(); err == nil {
 		out.Cache = store.Stats(idx2)
 	}
-	// #region agent log
-	agentLog("scheduler.go:SyncAll", "sync complete", "H2", map[string]any{
-		"notion_imported": out.Notion != nil && out.Notion.Error == "" && out.Notion.Imported+out.Notion.Updated > 0,
-		"notion_error":    notionErr(out.Notion),
-		"gdrive_error":    gdriveErr(out.GDrive),
-		"cache":           out.Cache,
-	})
-	// #endregion
 	return out, nil
-}
-
-func notionErr(s *NotionSyncSummary) string {
-	if s == nil {
-		return ""
-	}
-	return s.Error
-}
-
-func gdriveErr(s *GDriveSyncSummary) string {
-	if s == nil {
-		return ""
-	}
-	return s.Error
 }

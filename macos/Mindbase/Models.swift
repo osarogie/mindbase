@@ -74,13 +74,13 @@ struct VaultItem: Identifiable, Hashable {
     let modified: Date
 }
 
-struct TagCount: Identifiable, Hashable {
+struct TagCount: Identifiable, Hashable, Codable {
     var id: String { tag }
     let tag: String
     let count: Int
 }
 
-struct JournalDayLink: Identifiable, Hashable {
+struct JournalDayLink: Identifiable, Hashable, Codable {
     var id: String { date }
     let label: String
     let date: String

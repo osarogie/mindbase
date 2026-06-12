@@ -1,5 +1,29 @@
 // mindbase client — Alpine + Toast UI Editor + Notion-style slash commands
 
+function agentLog(location, message, data, hypothesisId) {
+  const payload = {
+    sessionId: 'c2f09c',
+    runId: 'web-editor',
+    hypothesisId,
+    location,
+    message,
+    data,
+    timestamp: Date.now(),
+  }
+  // #region agent log
+  fetch('http://127.0.0.1:7546/ingest/26116013-4ec7-4422-a613-8d6decc169b2', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'c2f09c' },
+    body: JSON.stringify(payload),
+  }).catch(() => {})
+  fetch('/api/debug/client-log', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  }).catch(() => {})
+  // #endregion
+}
+
 const SLASH_COMMANDS = {
   common: [
     { id: 'h1', label: 'Heading 1', hint: '# at line start', icon: 'H1', keywords: ['heading', 'h1', 'title'], insert: '# ', exec: (ed) => ed.exec('heading', { level: 1 }) },
@@ -44,8 +68,18 @@ document.addEventListener('alpine:init', () => {
     init() {
       this.documentKind = this.$el.dataset.documentKind || 'note'
       this.documentPath = this.$el.dataset.documentPath || ''
-      this.initRichEditor()
-      this.renderPreview()
+      agentLog('app.js:init', 'markdownDocumentEditor init', {
+        kind: this.documentKind,
+        path: this.documentPath,
+        protocol: location.protocol,
+        hasAppShell: !!document.querySelector('.app'),
+      }, 'H1')
+      this.$watch('mode', (value) => {
+        if (value !== 'edit') this.renderPreview()
+      })
+      this.$nextTick(() => {
+        this.initRichEditor(0)
+      })
     },
 
     allSlashCommands() {
@@ -71,52 +105,116 @@ document.addEventListener('alpine:init', () => {
       return `/notes/${this.documentPath}`
     },
 
-    insertBlock(text) {
-      if (!this.editor) return
-      if (this.editor.isWysiwygMode?.() && this.editor.getCurrentModeEditor) {
-        const ww = this.editor.getCurrentModeEditor()
-        ww?.replaceSelection?.(text)
-      } else {
-        const cur = this.editor.getMarkdown()
-        this.editor.setMarkdown(cur + (cur.endsWith('\n') ? '' : '\n') + text + '\n')
-      }
-      this.scheduleAutosave()
+    editorMountEl() {
+      return this.$refs.editorMount || this.$el.querySelector('.rich-editor-mount')
     },
 
-    initRichEditor() {
-      const source = this.$el.querySelector('#editor-source')
-      const mount = this.$el.querySelector('#rich-editor')
-      if (!source || !mount || typeof toastui === 'undefined' || !toastui.Editor) return
+    editorTextarea() {
+      const mount = this.editorMountEl()
+      return mount?.querySelector('.editor-markdown-input') || null
+    },
 
-      if (this.editor?.destroy) {
-        this.editor.destroy()
+    getMarkdown() {
+      const ta = this.editorTextarea()
+      if (ta) return ta.value
+      if (this.editor?.getMarkdown) return this.editor.getMarkdown()
+      return this.$el.querySelector('#editor-source')?.value || ''
+    },
+
+    setMarkdown(value) {
+      const source = this.$el.querySelector('#editor-source')
+      if (source) source.value = value
+      const ta = this.editorTextarea()
+      if (ta) ta.value = value
+      if (this.editor?.setMarkdown) this.editor.setMarkdown(value)
+    },
+
+    onEditorInput() {
+      const source = this.$el.querySelector('#editor-source')
+      const ta = this.editorTextarea()
+      if (source && ta) source.value = ta.value
+      this.scheduleAutosave()
+      this.syncSlashFromEditor()
+      if (this.mode !== 'edit') this.renderPreviewDebounced()
+    },
+
+    insertBlock(text) {
+      const ta = this.editorTextarea()
+      if (!ta) {
+        const cur = this.getMarkdown()
+        this.setMarkdown(cur + (cur.endsWith('\n') ? '' : '\n') + text + '\n')
+        this.onEditorInput()
+        return
+      }
+      const start = ta.selectionStart ?? ta.value.length
+      const end = ta.selectionEnd ?? ta.value.length
+      const val = ta.value
+      const before = val.slice(0, start)
+      const after = val.slice(end)
+      const pad = before.length > 0 && !before.endsWith('\n') ? '\n' : ''
+      const snippet = `${pad}${text}\n`
+      ta.value = before + snippet + after
+      const cursor = before.length + snippet.length
+      ta.focus()
+      ta.setSelectionRange(cursor, cursor)
+      this.onEditorInput()
+    },
+
+    initRichEditor(attempt = 0) {
+      const source = this.$el.querySelector('#editor-source')
+      const mount = this.editorMountEl()
+      if (!source || !mount) {
+        agentLog('app.js:initRichEditor', 'missing mount or source', { attempt }, 'H2')
+        if (attempt < 40) {
+          setTimeout(() => this.initRichEditor(attempt + 1), 50)
+        }
+        return
       }
 
-      this.editor = new toastui.Editor({
-        el: mount,
-        height: '100%',
-        initialEditType: 'wysiwyg',
-        previewStyle: 'vertical',
-        hideModeSwitch: false,
-        usageStatistics: false,
-        initialValue: source.value || '',
-        toolbarItems: [
-          ['heading', 'bold', 'italic', 'strike'],
-          ['hr', 'quote'],
-          ['ul', 'ol', 'task'],
-          ['table', 'link'],
-          ['code', 'codeblock'],
-        ],
-      })
+      if (mount.dataset.editorReady === '1' && this.editorTextarea()) {
+        return
+      }
 
-      this.editor.on('change', () => {
-        this.scheduleAutosave()
-        this.syncSlashFromEditor()
-        if (this.mode !== 'edit') this.renderPreviewDebounced()
-      })
+      mount.innerHTML = ''
+      mount.dataset.editorReady = '1'
 
-      mount.addEventListener('keydown', (e) => this.onEditorKeydown(e), true)
-      mount.addEventListener('keyup', (e) => this.onEditorKeyup(e), true)
+      const toolbar = document.createElement('div')
+      toolbar.className = 'editor-toolbar'
+      const quick = [
+        ['H1', '# '],
+        ['H2', '## '],
+        ['List', '- '],
+        ['Task', '- [ ] '],
+        ['Code', '```\n\n```'],
+        ['Link', '[label](url)'],
+        ['Wiki', '[[welcome]]'],
+        ['DB', '[[db:projects]]'],
+      ]
+      for (const [label, snippet] of quick) {
+        const btn = document.createElement('button')
+        btn.type = 'button'
+        btn.textContent = label
+        btn.addEventListener('click', () => this.insertBlock(snippet))
+        toolbar.appendChild(btn)
+      }
+
+      const textarea = document.createElement('textarea')
+      textarea.className = 'editor-markdown-input'
+      textarea.spellcheck = true
+      textarea.value = source.value || ''
+      textarea.addEventListener('input', () => this.onEditorInput())
+      textarea.addEventListener('keydown', (e) => this.onEditorKeydown(e))
+      textarea.addEventListener('keyup', (e) => this.onEditorKeyup(e))
+
+      mount.append(toolbar, textarea)
+
+      agentLog('app.js:initRichEditor', 'markdown editor ready', {
+        path: this.documentPath,
+        attempt,
+        height: mount.getBoundingClientRect().height,
+      }, 'H1')
+
+      this.onEditorInput()
     },
 
     onEditorKeydown(e) {
@@ -181,8 +279,7 @@ document.addEventListener('alpine:init', () => {
     },
 
     getSlashQueryFromMarkdown() {
-      if (!this.editor) return null
-      const md = this.editor.getMarkdown()
+      const md = this.getMarkdown()
       const lines = md.split('\n')
       for (let i = lines.length - 1; i >= 0; i--) {
         const m = lines[i].match(/\/([\w-]*)$/)
@@ -192,34 +289,22 @@ document.addEventListener('alpine:init', () => {
     },
 
     removeSlashToken() {
-      if (!this.editor) return
-      const lines = this.editor.getMarkdown().split('\n')
+      const lines = this.getMarkdown().split('\n')
       for (let i = lines.length - 1; i >= 0; i--) {
         if (/\/[\w-]*$/.test(lines[i])) {
           lines[i] = lines[i].replace(/\/[\w-]*$/, '')
-          this.editor.setMarkdown(lines.join('\n'))
+          this.setMarkdown(lines.join('\n'))
+          this.onEditorInput()
           return
         }
       }
     },
 
     runSlashCommand(cmd) {
-      if (!cmd || !this.editor) return
+      if (!cmd) return
       this.removeSlashToken()
-      if (this.editor.isWysiwygMode?.() && cmd.exec) {
-        try {
-          cmd.exec(this.editor)
-        } catch (_) {
-          this.insertBlock(cmd.insert)
-        }
-      } else {
-        this.insertBlock(cmd.insert)
-      }
-      // #region agent log
-      fetch('http://127.0.0.1:7546/ingest/19aeefbe-e543-4029-bbca-6ccc85f380f3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c2f09c'},body:JSON.stringify({sessionId:'c2f09c',location:'app.js:runSlashCommand',message:'slash command',data:{id:cmd.id,kind:this.documentKind},timestamp:Date.now(),hypothesisId:'H8'})}).catch(()=>{});
-      // #endregion
+      this.insertBlock(cmd.insert)
       this.closeSlash()
-      this.scheduleAutosave()
     },
 
     closeSlash() {
@@ -241,33 +326,72 @@ document.addEventListener('alpine:init', () => {
       this._previewTimer = setTimeout(() => this.renderPreview(), 350)
     },
 
+    currentMarkdown() {
+      return this.getMarkdown()
+    },
+
     async renderPreview() {
       if (!this.documentPath) return
+      const content = this.currentMarkdown()
       if (this.documentKind === 'database') {
-        const content = this.editor ? this.editor.getMarkdown() : this.$el.querySelector('#editor-source')?.value || ''
         this.previewHTML = `<div class="markdown-preview-inner"><pre>${escapeHtml(content)}</pre></div>`
         return
       }
-      const res = await fetch(`/preview/${this.documentPath}`)
-      const html = await res.text()
-      this.previewHTML = html.replace(/^<div class="markdown-preview-inner">|<\/div>$/g, '')
-      this.$nextTick(() => this.enhancePreview())
+      try {
+        const res = await fetch('/preview', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content, path: this.documentPath }),
+        })
+        if (!res.ok) throw new Error(await res.text())
+        const html = await res.text()
+        this.previewHTML = unwrapPreviewHTML(html)
+        agentLog('app.js:renderPreview', 'preview updated', {
+          path: this.documentPath,
+          contentLength: content.length,
+          htmlLength: this.previewHTML.length,
+        }, 'H3')
+        this.$nextTick(() => {
+          this.enhancePreview()
+          const root = this.$refs.previewMount
+          if (root && typeof htmx !== 'undefined') {
+            htmx.process(root)
+          }
+          agentLog('app.js:renderPreview', 'preview dom mounted', {
+            path: this.documentPath,
+            childCount: root?.childElementCount || 0,
+            visible: root ? root.offsetParent !== null : false,
+            mode: this.mode,
+          }, 'H6')
+        })
+      } catch (err) {
+        this.previewHTML = `<p class="muted">Preview failed: ${escapeHtml(String(err.message || err))}</p>`
+        agentLog('app.js:renderPreview', 'preview failed', {
+          path: this.documentPath,
+          error: String(err.message || err),
+        }, 'H3')
+      }
     },
 
     enhancePreview() {
-      document.querySelectorAll('.mermaid-block pre.mermaid').forEach(async (el) => {
+      const root = this.$refs.previewMount || this.$el
+      if (typeof mermaid !== 'undefined' && !window.__mindbaseMermaidInit) {
+        mermaid.initialize({ startOnLoad: false, suppressErrorRendering: true, theme: 'dark' })
+        window.__mindbaseMermaidInit = true
+      }
+      root.querySelectorAll('.mermaid-block pre.mermaid').forEach(async (el) => {
         if (el.dataset.rendered) return
         el.dataset.rendered = '1'
-        if (typeof mermaid !== 'undefined') {
-          try {
-            const { svg } = await mermaid.render('m-' + Math.random().toString(36).slice(2), el.textContent)
-            el.parentElement.innerHTML = svg
-          } catch (e) {
-            el.textContent = String(e)
-          }
+        const source = (el.textContent || '').trim()
+        if (!source || typeof mermaid === 'undefined') return
+        try {
+          const { svg } = await mermaid.render('m-' + Math.random().toString(36).slice(2), source)
+          el.parentElement.innerHTML = svg
+        } catch (e) {
+          el.parentElement.innerHTML = `<pre class="mermaid-error">${escapeHtml(String(e.message || e))}</pre>`
         }
       })
-      document.querySelectorAll('.excalidraw-file-link').forEach((el) => {
+      root.querySelectorAll('.excalidraw-file-link').forEach((el) => {
         el.addEventListener('click', (e) => {
           e.preventDefault()
           loadExcalidrawFile(this.documentPath, el.dataset.file)
@@ -276,11 +400,8 @@ document.addEventListener('alpine:init', () => {
     },
 
     async save(manual = false) {
-      const content = this.editor ? this.editor.getMarkdown() : this.$el.querySelector('#editor-source')?.value
+      const content = this.currentMarkdown()
       this.saveStatus = 'Saving…'
-      // #region agent log
-      fetch('http://127.0.0.1:7546/ingest/19aeefbe-e543-4029-bbca-6ccc85f380f3',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'c2f09c'},body:JSON.stringify({sessionId:'c2f09c',location:'app.js:save',message:'document save',data:{kind:this.documentKind,path:this.documentPath,manual,bytes:(content||'').length},timestamp:Date.now(),hypothesisId:'H7'})}).catch(()=>{});
-      // #endregion
       const res = await fetch(this.saveUrl(), {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', 'HX-Request': 'true' },
@@ -331,6 +452,8 @@ document.addEventListener('alpine:init', () => {
   Alpine.data('connectorsPanel', () => ({
     loading: false,
     message: '',
+    syncSource: 'notion',
+    syncSink: 'gdrive',
     creds: {},
     forms: {
       notion_token: '',
@@ -342,7 +465,58 @@ document.addEventListener('alpine:init', () => {
     },
 
     async init() {
-      await this.loadCredentials()
+      await Promise.all([this.loadCredentials(), this.loadConfig()])
+    },
+
+    async loadConfig() {
+      try {
+        const cfg = await fetch('/api/connectors/config').then((r) => r.json())
+        this.syncSource = cfg.source || 'notion'
+        this.syncSink = cfg.sink || 'gdrive'
+      } catch (_) {
+        this.syncSource = 'notion'
+        this.syncSink = 'gdrive'
+      }
+    },
+
+    topologySummary() {
+      const names = { notion: 'Notion', gdrive: 'Google Drive' }
+      const src = names[this.syncSource] || this.syncSource
+      const sink = names[this.syncSink] || this.syncSink
+      return `${src} → vault → ${sink}`
+    },
+
+    async saveSyncTopology() {
+      if (this.syncSource === this.syncSink) {
+        this.message = 'Source and sink must be different connectors'
+        return
+      }
+      if (this.syncSink === 'notion') {
+        this.message = 'Notion as sink is not supported yet — choose Google Drive'
+        this.syncSink = 'gdrive'
+        return
+      }
+      this.loading = true
+      this.message = 'Saving sync topology…'
+      try {
+        const cfg = await fetch('/api/connectors/config').then((r) => r.json())
+        cfg.source = this.syncSource
+        cfg.sink = this.syncSink
+        const res = await fetch('/api/connectors/config', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(cfg),
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || res.statusText)
+        this.syncSource = data.source || this.syncSource
+        this.syncSink = data.sink || this.syncSink
+        this.message = `Sync topology saved: ${this.topologySummary()}`
+      } catch (e) {
+        this.message = String(e.message || e)
+      } finally {
+        this.loading = false
+      }
     },
 
     async loadCredentials() {
@@ -458,7 +632,7 @@ document.addEventListener('alpine:init', () => {
 
     async syncAll() {
       this.loading = true
-      this.message = 'Syncing Notion + Google Drive to local cache…'
+      this.message = `Syncing ${this.topologySummary()}…`
       try {
         const res = await fetch('/api/connectors/sync', { method: 'POST' })
         const data = await res.json()
@@ -514,14 +688,16 @@ document.addEventListener('alpine:init', () => {
 
     async ensureEnabled(kind) {
       const cfg = await fetch('/api/connectors/config').then((r) => r.json())
-      if (kind === 'notion' && !cfg.notion?.enabled) {
-        cfg.notion.enabled = true
-        await fetch('/api/connectors/config', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cfg) })
+      cfg.source = cfg.source || 'notion'
+      cfg.sink = cfg.sink || 'gdrive'
+      if (kind === 'notion' && cfg.source !== 'notion') {
+        cfg.source = 'notion'
+        if (cfg.sink === 'notion') cfg.sink = 'gdrive'
       }
-      if (kind === 'gdrive' && !cfg.gdrive?.enabled) {
-        cfg.gdrive.enabled = true
-        await fetch('/api/connectors/config', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cfg) })
+      if (kind === 'gdrive' && cfg.sink !== 'gdrive' && cfg.source !== 'gdrive') {
+        cfg.sink = 'gdrive'
       }
+      await fetch('/api/connectors/config', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cfg) })
     },
   }))
 
@@ -601,13 +777,78 @@ window.mindbaseSync = {
   },
 }
 
-document.body.addEventListener('htmx:afterSwap', (e) => {
-  if (e.detail.target?.id === 'main') {
-    const docEl = e.detail.target.querySelector('[data-document-kind]')
-    if (docEl?._x_dataStack?.[0]?.initRichEditor) {
-      docEl._x_dataStack[0].initRichEditor()
-      docEl._x_dataStack[0].renderPreview?.()
+function unwrapPreviewHTML(html) {
+  const trimmed = String(html || '').trim()
+  const prefix = '<div class="markdown-preview-inner">'
+  const suffix = '</div>'
+  if (trimmed.startsWith(prefix) && trimmed.endsWith(suffix)) {
+    return trimmed.slice(prefix.length, trimmed.length - suffix.length)
+  }
+  return trimmed
+}
+
+function reinitMainEditor(mainEl) {
+  if (!mainEl || mainEl.id !== 'main') return
+  if (typeof Alpine !== 'undefined' && Alpine.initTree) {
+    Alpine.initTree(mainEl)
+  }
+  requestAnimationFrame(() => {
+    const docEl = mainEl.querySelector('[data-document-kind]')
+    if (!docEl) {
+      agentLog('app.js:htmx:afterSettle', 'main swapped (no editor page)', {}, 'H2')
+      return
     }
+    const state = docEl._x_dataStack?.[0]
+    const mount = state?.editorMountEl?.()
+    const ready = mount?.dataset.editorReady === '1' && state?.editorTextarea?.()
+    if (ready) {
+      state.renderPreview?.()
+      agentLog('app.js:htmx:afterSettle', 'main swapped (editor kept)', {
+        path: state?.documentPath || '',
+        hasTextarea: true,
+      }, 'H2')
+      return
+    }
+    if (mount) delete mount.dataset.editorReady
+    if (state?.initRichEditor) {
+      state.initRichEditor(0)
+      state.renderPreview?.()
+    }
+    agentLog('app.js:htmx:afterSettle', 'main swapped', {
+      path: state?.documentPath || '',
+      hasEditor: Boolean(state?.initRichEditor),
+      hasTextarea: Boolean(state?.editorTextarea?.()),
+    }, 'H2')
+  })
+}
+
+document.body.addEventListener('htmx:afterSettle', (e) => {
+  if (e.detail.target?.id !== 'main') return
+  reinitMainEditor(e.detail.target)
+})
+
+window.addEventListener('pageshow', (e) => {
+  if (!e.persisted) return
+  const main = document.getElementById('main')
+  if (main) reinitMainEditor(main)
+})
+
+document.addEventListener('DOMContentLoaded', () => {
+  // #region agent log
+  const cs = getComputedStyle(document.documentElement)
+  agentLog('app.js:boot', 'theme tokens applied', {
+    bg: cs.getPropertyValue('--bg').trim(),
+    accent: cs.getPropertyValue('--accent').trim(),
+    editorBg: cs.getPropertyValue('--editor-bg').trim(),
+    hasPageSheet: Boolean(document.querySelector('.page-sheet')),
+  }, 'design')
+  // #endregion
+  if (location.protocol === 'file:') {
+    agentLog('app.js:boot', 'file protocol — use make dev URL', { href: location.href }, 'H5')
+    const warn = document.createElement('div')
+    warn.className = 'file-protocol-warning'
+    warn.innerHTML = '<strong>mindbase must run through the local server.</strong> Use <code>make dev</code> then open <a href="http://localhost:8090">http://localhost:8090</a> — not a saved HTML file.'
+    document.body.prepend(warn)
   }
 })
 

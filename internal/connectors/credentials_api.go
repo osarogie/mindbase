@@ -129,13 +129,6 @@ func (s *Service) UpdateCredentials(req UpdateCredentialsRequest) (secrets.View,
 	if err != nil {
 		return secrets.View{}, err
 	}
-	// #region agent log
-	agentLog("credentials_api.go:UpdateCredentials", "credentials saved", "H5", map[string]any{
-		"notion_set": view.NotionTokenSet,
-		"gdrive_set": view.GDriveConnected,
-		"claude_set": view.AnthropicKeySet,
-	})
-	// #endregion
 	return view, nil
 }
 

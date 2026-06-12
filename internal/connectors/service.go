@@ -143,14 +143,40 @@ func (s *Service) ImportNotion() (*notion.ImportResult, error) {
 
 func (s *Service) SyncGDrive() (*gdrive.SyncResult, error) {
 	creds := resolveCredentials(s.vault, s.config)
-	res, err := gdrive.SyncWithJSON(
-		s.vault,
-		creds.GDriveCredJSON,
-		creds.GDriveTokenJSON,
-		s.config.GDrive.FolderID,
-		s.config.GDrive.MirrorNotes,
-		s.config.GDrive.MirrorDatabases,
+	cfg := normalizeSourceSink(s.config)
+	var (
+		res *gdrive.SyncResult
+		err error
 	)
+	switch {
+	case cfg.Sink == ConnectorGDrive:
+		res, err = gdrive.SyncPushJSON(
+			s.vault, cache.New(s.vault),
+			creds.GDriveCredJSON,
+			creds.GDriveTokenJSON,
+			s.config.GDrive.FolderID,
+			s.config.GDrive.MirrorNotes,
+			s.config.GDrive.MirrorDatabases,
+		)
+	case cfg.Source == ConnectorGDrive:
+		res, err = gdrive.SyncPullJSON(
+			s.vault, cache.New(s.vault),
+			creds.GDriveCredJSON,
+			creds.GDriveTokenJSON,
+			s.config.GDrive.FolderID,
+			s.config.GDrive.MirrorNotes,
+			s.config.GDrive.MirrorDatabases,
+		)
+	default:
+		res, err = gdrive.SyncBidirectionalJSON(
+			s.vault, cache.New(s.vault),
+			creds.GDriveCredJSON,
+			creds.GDriveTokenJSON,
+			s.config.GDrive.FolderID,
+			s.config.GDrive.MirrorNotes,
+			s.config.GDrive.MirrorDatabases,
+		)
+	}
 	if err != nil {
 		return nil, err
 	}

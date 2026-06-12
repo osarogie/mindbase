@@ -58,6 +58,11 @@ func (a *API) handlePutConfig(w http.ResponseWriter, r *http.Request) {
 	if cfg.Version == 0 {
 		cfg.Version = 1
 	}
+	cfg = normalizeSourceSink(cfg)
+	if err := ValidateSourceSink(cfg); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
 	if err := a.svc.UpdateConfig(cfg); err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return

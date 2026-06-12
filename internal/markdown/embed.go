@@ -7,7 +7,7 @@ import (
 	"github.com/osarogie/mindbase/internal/database"
 )
 
-func renderDatabaseTableHTML(table *database.Table, caption string) string {
+func renderDatabaseTableHTML(table *database.Table, caption string, opts RenderOptions) string {
 	var b strings.Builder
 	b.WriteString(`<div class="database-embed">`)
 	if caption != "" {
@@ -30,7 +30,7 @@ func renderDatabaseTableHTML(table *database.Table, caption string) string {
 				cell = row[i]
 			}
 			b.WriteString("<td>")
-			b.WriteString(template.HTMLEscapeString(cell))
+			b.WriteString(FormatCellLinks(cell, opts))
 			b.WriteString("</td>")
 		}
 		b.WriteString("</tr>")

@@ -7,6 +7,9 @@ mobile/node_modules/
 mobile/ios/
 mobile/android/
 macos/build/
+macos/lib/
+mobile/native/**/*.a
+mobile/native/**/*.so
 *.app
 .DS_Store
 package-lock.json

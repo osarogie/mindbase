@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/osarogie/mindbase/internal/vault"
+	"github.com/osarogie/mindbase/internal/vaultgit"
 )
 
 type Entry struct {
@@ -109,6 +110,7 @@ func (s *Service) Save(relPath, content string) (*Note, error) {
 	if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
 		return nil, fmt.Errorf("write note: %w", err)
 	}
+	_ = vaultgit.Track(s.vault.Root, []string{vaultgit.NotePath(relPath)}, "Update note "+relPath)
 	return s.Get(relPath)
 }
 
@@ -125,6 +127,7 @@ func (s *Service) Delete(relPath string) error {
 	if err == nil && dirExists(attachDir) {
 		_ = os.RemoveAll(attachDir)
 	}
+	_ = vaultgit.Track(s.vault.Root, []string{vaultgit.NotePath(relPath)}, "Delete note "+relPath)
 	return nil
 }
 

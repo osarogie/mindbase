@@ -3,7 +3,8 @@
   "private": true,
   "packageManager": "pnpm@10.12.1",
   "scripts": {
-    "mobile:sync": "pnpm --filter mindbase-mobile sync",
+    "mobile:prebuild": "pnpm --filter mindbase-mobile prebuild",
+    "mobile:start": "pnpm --filter mindbase-mobile start",
     "mobile:ios": "pnpm --filter mindbase-mobile ios",
     "mobile:android": "pnpm --filter mindbase-mobile android",
     "web:build": "pnpm --filter mindbase-web build",

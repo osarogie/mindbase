@@ -30,10 +30,29 @@ type RenderOptions struct {
 	LoadDatabase func(name string) (*database.Table, error)
 }
 
+type embedHolder struct {
+	blocks []string
+}
+
+func (h *embedHolder) stash(html string) string {
+	id := len(h.blocks)
+	h.blocks = append(h.blocks, html)
+	return fmt.Sprintf("<!--EMBED:%d-->", id)
+}
+
+func (h *embedHolder) restore(content string) string {
+	for id, html := range h.blocks {
+		content = strings.Replace(content, fmt.Sprintf("<!--EMBED:%d-->", id), html, 1)
+	}
+	return content
+}
+
 func Render(content string, opts RenderOptions) template.HTML {
-	content = renderMermaidBlocks(content)
-	content = renderExcalidrawBlocks(content)
+	embeds := &embedHolder{}
+	content = renderMermaidBlocks(content, embeds)
+	content = renderExcalidrawBlocks(content, embeds)
 	content = renderBasicMarkdown(content, opts)
+	content = embeds.restore(content)
 	return template.HTML(content)
 }
 
@@ -53,7 +72,7 @@ func renderWikiToken(match string, opts RenderOptions) string {
 		if err != nil {
 			return fmt.Sprintf(`<div class="database-embed missing"><em>Database not found: %s</em></div>`, template.HTMLEscapeString(name))
 		}
-		return renderDatabaseTableHTML(table, label)
+		return renderDatabaseTableHTML(table, label, opts)
 	}
 
 	target = stripPagePrefix(target)
@@ -90,25 +109,27 @@ func BuildNoteIndex(paths []string) map[string]string {
 	return index
 }
 
-func renderMermaidBlocks(content string) string {
+func renderMermaidBlocks(content string, embeds *embedHolder) string {
 	return mermaidRe.ReplaceAllStringFunc(content, func(match string) string {
 		parts := mermaidRe.FindStringSubmatch(match)
 		if len(parts) < 2 {
 			return match
 		}
 		code := template.HTMLEscapeString(strings.TrimSpace(parts[1]))
-		return fmt.Sprintf(`<div class="mermaid-block"><pre class="mermaid">%s</pre></div>`, code)
+		html := fmt.Sprintf(`<div class="mermaid-block"><pre class="mermaid">%s</pre></div>`, code)
+		return embeds.stash(html)
 	})
 }
 
-func renderExcalidrawBlocks(content string) string {
+func renderExcalidrawBlocks(content string, embeds *embedHolder) string {
 	return excalidrawRe.ReplaceAllStringFunc(content, func(match string) string {
 		parts := excalidrawRe.FindStringSubmatch(match)
 		if len(parts) < 2 {
 			return match
 		}
 		raw := template.HTMLEscapeString(strings.TrimSpace(parts[1]))
-		return fmt.Sprintf(`<div class="excalidraw-embed" data-excalidraw="%s"></div>`, raw)
+		html := fmt.Sprintf(`<div class="excalidraw-embed" data-excalidraw="%s"></div>`, raw)
+		return embeds.stash(html)
 	})
 }
 
@@ -136,6 +157,12 @@ func renderBasicMarkdown(content string, opts RenderOptions) string {
 		trimmed := strings.TrimSpace(line)
 
 		if strings.HasPrefix(trimmed, "<div class=\"mermaid-block\">") || strings.HasPrefix(trimmed, "<div class=\"excalidraw-embed\"") {
+			closeList()
+			closeTable()
+			buf.WriteString(trimmed + "\n")
+			continue
+		}
+		if strings.HasPrefix(trimmed, "<!--EMBED:") && strings.HasSuffix(trimmed, "-->") {
 			closeList()
 			closeTable()
 			buf.WriteString(trimmed + "\n")

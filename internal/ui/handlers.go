@@ -14,7 +14,6 @@ import (
 	"github.com/osarogie/mindbase/internal/connectors"
 	"github.com/osarogie/mindbase/internal/attachments"
 	"github.com/osarogie/mindbase/internal/database"
-	"github.com/osarogie/mindbase/internal/debuglog"
 	"github.com/osarogie/mindbase/internal/excalidraw"
 	"github.com/osarogie/mindbase/internal/journal"
 	"github.com/osarogie/mindbase/internal/markdown"
@@ -64,6 +63,7 @@ func (h *Handlers) Mount(r chi.Router) {
 	r.Get("/search", h.handleSearch)
 	r.Post("/attachments/*", h.handleUploadAttachment)
 	r.Get("/preview/*", h.handlePreview)
+	r.Post("/preview", h.handlePreviewBody)
 	r.Get("/excalidraw/{note}/*", h.handleExcalidraw)
 	r.Get("/sync/status", h.handleSyncStatus)
 	r.Get("/journal/today", h.handleJournalToday)
@@ -194,12 +194,6 @@ func (h *Handlers) handleSaveNote(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 500)
 		return
 	}
-	// #region agent log
-	debuglog.Write("handlers.go:handleSaveNote", "note saved", "H7", map[string]any{
-		"path": path,
-		"bytes": len(content),
-	})
-	// #endregion
 	if r.Header.Get("HX-Request") == "true" {
 		w.WriteHeader(http.StatusOK)
 		return
@@ -270,12 +264,6 @@ func (h *Handlers) handleSaveDatabase(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 500)
 		return
 	}
-	// #region agent log
-	debuglog.Write("handlers.go:handleSaveDatabase", "database saved", "H7", map[string]any{
-		"name": name,
-		"markdown": payload.Content != "",
-	})
-	// #endregion
 	if r.Header.Get("HX-Request") == "true" {
 		w.WriteHeader(http.StatusOK)
 		return
@@ -332,12 +320,41 @@ func (h *Handlers) handleUploadAttachment(w http.ResponseWriter, r *http.Request
 
 func (h *Handlers) handlePreview(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(chi.URLParam(r, "*"), "/")
+	if path == "" {
+		http.NotFound(w, r)
+		return
+	}
+	// Avoid orphan HTML documents (browser tab shows a raw HTML file icon).
+	if r.Header.Get("HX-Request") != "true" {
+		http.Redirect(w, r, "/notes/"+path, http.StatusSeeOther)
+		return
+	}
 	note, err := h.notes.Get(path)
 	if err != nil {
 		http.NotFound(w, r)
 		return
 	}
-	html := string(markdown.Render(note.Content, h.renderOpts(path)))
+	h.writePreviewHTML(w, note.Content, path)
+}
+
+func (h *Handlers) handlePreviewBody(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		Content string `json:"content"`
+		Path    string `json:"path"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	path := strings.Trim(payload.Path, "/")
+	if path == "" {
+		path = "preview.md"
+	}
+	h.writePreviewHTML(w, payload.Content, path)
+}
+
+func (h *Handlers) writePreviewHTML(w http.ResponseWriter, content, notePath string) {
+	html := string(markdown.Render(content, h.renderOpts(notePath)))
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = w.Write([]byte(`<div class="markdown-preview-inner">` + html + `</div>`))
 }
@@ -497,12 +514,6 @@ func (h *Handlers) handleReveal(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	// #region agent log
-	debuglog.Write("handlers.go:handleReveal", "reveal ok", "H6", map[string]any{
-		"kind": req.Kind,
-		"path": abs,
-	})
-	// #endregion
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(map[string]string{"path": abs})
 }

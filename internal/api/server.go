@@ -33,6 +33,17 @@ type Server struct {
 	webDir      string
 	webFS       fs.FS
 	useLegacyUI bool
+	runtime     RuntimeInfo
+}
+
+// RuntimeInfo describes how the HTTP server is exposed.
+type RuntimeInfo struct {
+	TLS   bool
+	HTTP3 bool
+}
+
+func (s *Server) SetRuntimeInfo(info RuntimeInfo) {
+	s.runtime = info
 }
 
 func New(v *vault.Vault, webDir string) (*Server, error) {
@@ -78,6 +89,7 @@ func (s *Server) Router() http.Handler {
 	}))
 
 	r.Get("/api/health", s.handleHealth)
+	r.Post("/api/debug/client-log", s.handleClientDebugLog)
 	r.Get("/api/vault", s.handleVaultInfo)
 	r.Get("/api/search", s.handleAPISearch)
 
@@ -112,7 +124,7 @@ func (s *Server) Router() http.Handler {
 		connectors.NewAPI(s.connectors).Mount(r)
 	})
 
-	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.FS(uistatic.Files))))
+	r.Handle("/static/*", uistatic.Handler())
 
 	if s.useLegacyUI {
 		r.Get("/*", s.serveSPA)
@@ -146,7 +158,12 @@ func (s *Server) Close() {
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, map[string]string{"status": "ok"})
+	writeJSON(w, map[string]any{
+		"status": "ok",
+		"proto":  r.Proto,
+		"tls":    s.runtime.TLS,
+		"http3":  s.runtime.HTTP3,
+	})
 }
 
 func (s *Server) handleVaultInfo(w http.ResponseWriter, r *http.Request) {

@@ -9,24 +9,30 @@ templ Layout(data PageData) {
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
 			<meta name="apple-mobile-web-app-capable" content="yes"/>
-			<meta name="theme-color" content="#0f0f14"/>
+			<meta name="theme-color" content="#F6F2E8"/>
+			<link rel="preconnect" href="https://fonts.googleapis.com"/>
+			<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin=""/>
+			<link href="https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,500;0,7..72,600;0,7..72,700;1,7..72,400&amp;display=swap" rel="stylesheet"/>
 			<link rel="icon" href="/static/icons/favicon.svg" type="image/svg+xml"/>
 			<link rel="icon" href="/static/icons/favicon-32.png" sizes="32x32" type="image/png"/>
 			<link rel="icon" href="/static/icons/favicon-16.png" sizes="16x16" type="image/png"/>
 			<link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png"/>
 			<title>{ data.VaultName } · mindbase</title>
 			<script src="https://unpkg.com/htmx.org@2.0.4"></script>
-			<script defer src="https://unpkg.com/alpinejs@3.14.8/dist/cdn.min.js"></script>
-			<link rel="stylesheet" href="https://uicdn.toast.com/editor/latest/toastui-editor.min.css"/>
 			<link rel="stylesheet" href="/static/app.css"/>
 		</head>
-		<body x-data="{ sidebar: false, mode: 'split' }" hx-ext="sse">
+		<body x-data="{ sidebar: false }" hx-ext="sse">
 			<div class="app">
 				<div class="sidebar-backdrop" x-show="sidebar" x-cloak @click="sidebar=false"></div>
 				<aside class="sidebar" :class="{ open: sidebar }">
 					<div class="sidebar-header">
-						<img src="/static/icons/favicon-32.png" alt="" class="app-logo" width="24" height="24"/>
-						<h1>mindbase</h1>
+						<div class="brand-lockup">
+							<img src="/static/icons/favicon-32.png" alt="" class="app-logo" width="24" height="24"/>
+							<div class="brand-text">
+								<h1>mindbase</h1>
+								<span class="vault-path">{ data.VaultName }</span>
+							</div>
+						</div>
 						<button type="button" class="icon-btn mobile-only" @click="sidebar=false">✕</button>
 					</div>
 					if data.View != "connectors" {
@@ -54,11 +60,13 @@ templ Layout(data PageData) {
 				</aside>
 				<button type="button" class="menu-btn mobile-only" @click="sidebar=true">☰</button>
 				<main id="main" class="main">
-					<div class="vault-badge">{ data.VaultName }</div>
+					<div class="status-badges">
+						<div class="vault-badge">{ data.VaultName }</div>
+						<div id="sync-status" hx-get="/sync/status" hx-trigger="load, every 30s" hx-swap="innerHTML"></div>
+					</div>
 					@MainContent(data)
 				</main>
 			</div>
-			<div id="sync-status" hx-get="/sync/status" hx-trigger="load, every 30s" hx-swap="innerHTML"></div>
 			<div x-data="aiAssistant()" @open-ai.window="open=true">
 				<button type="button" class="ai-fab" x-show="!open" @click="open=true" title="Ask Claude">✦</button>
 				<div class="ai-panel" x-show="open" x-cloak>
@@ -79,9 +87,9 @@ templ Layout(data PageData) {
 					</div>
 				</div>
 			</div>
-			<script src="https://uicdn.toast.com/editor/latest/toastui-editor-all.min.js"></script>
 			<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
-			<script type="module" src="/static/app.js"></script>
+			<script src="/static/app.js"></script>
+			<script defer src="https://unpkg.com/alpinejs@3.14.8/dist/cdn.min.js"></script>
 		</body>
 	</html>
 }
@@ -337,8 +345,8 @@ templ MarkdownDocumentEditor(kind, path, title, content string, note *NotePage) 
 		<header class="content-header notion-header">
 			<div class="page-breadcrumb">
 				<a href="/" hx-get="/" hx-target="#main" hx-push-url="true">Library</a>
-				<span>/</span>
-				<span>{ title }</span>
+				<span class="crumb-sep">/</span>
+				<span class="crumb-current">{ title }</span>
 				if kind == "database" {
 					<small class="muted"> · database</small>
 				}
@@ -347,56 +355,62 @@ templ MarkdownDocumentEditor(kind, path, title, content string, note *NotePage) 
 				if kind == "note" {
 					<button type="button" class="ai-trigger" @click="$dispatch('open-ai')" title="Ask Claude">✦ AI</button>
 				}
-				<div class="mode-toggle">
-					<button type="button" :class="{ active: mode==='edit' }" @click="mode='edit'">Edit</button>
-					<button type="button" :class="{ active: mode==='split' }" @click="mode='split'">Split</button>
-					<button type="button" :class="{ active: mode==='preview' }" @click="mode='preview'; renderPreview()">Preview</button>
+				<div class="mode-toggle" role="tablist" aria-label="Editor mode">
+					<button type="button" role="tab" :class="{ active: mode==='edit' }" @click="mode='edit'">Edit</button>
+					<button type="button" role="tab" :class="{ active: mode==='split' }" @click="mode='split'">Split</button>
+					<button type="button" role="tab" :class="{ active: mode==='preview' }" @click="mode='preview'; renderPreview()">Preview</button>
 				</div>
 				<span class="save-status muted" x-text="saveStatus" x-show="saveStatus"></span>
 				<button type="button" class="primary" @click="save(true)">Save</button>
 			</div>
 		</header>
-		<div class="notion-title-bar">
-			<h1 class="page-title">{ title }</h1>
-			if note != nil && (note.JournalPrev != "" || note.JournalNext != "") {
-				<div class="journal-day-nav">
-					if note.JournalPrev != "" {
-						<a href={ templ.SafeURL("/journal/" + note.JournalPrev) } hx-get={ "/journal/" + note.JournalPrev } hx-target="#main" hx-push-url="true">← { note.JournalPrev }</a>
+		<div class="note-body">
+			<div class="page-canvas">
+				<div class="page-sheet">
+					<div class="notion-title-bar">
+						<h1 class="page-title">{ title }</h1>
+						if note != nil && (note.JournalPrev != "" || note.JournalNext != "") {
+							<div class="journal-day-nav">
+								if note.JournalPrev != "" {
+									<a href={ templ.SafeURL("/journal/" + note.JournalPrev) } hx-get={ "/journal/" + note.JournalPrev } hx-target="#main" hx-push-url="true">← { note.JournalPrev }</a>
+								}
+								if note.JournalNext != "" {
+									<a href={ templ.SafeURL("/journal/" + note.JournalNext) } hx-get={ "/journal/" + note.JournalNext } hx-target="#main" hx-push-url="true">{ note.JournalNext } →</a>
+								}
+							</div>
+						}
+					</div>
+					if note != nil {
+						@NoteMetaPanel(*note)
 					}
-					if note.JournalNext != "" {
-						<a href={ templ.SafeURL("/journal/" + note.JournalNext) } hx-get={ "/journal/" + note.JournalNext } hx-target="#main" hx-push-url="true">{ note.JournalNext } →</a>
-					}
+					<div class="editor-pane" :class="'mode-' + mode">
+						<div class="editor-wrap rich-editor-wrap" x-show="mode !== 'preview'">
+							<div class="slash-menu notion-slash" x-show="showSlash" x-cloak @click.outside="closeSlash()">
+								<div class="slash-menu-header">Commands</div>
+								<template x-for="(cmd, i) in filteredSlashCommands()" :key="cmd.id">
+									<button
+										type="button"
+										class="slash-cmd"
+										:class="{ active: slashIndex === i }"
+										@click="runSlashCommand(cmd)"
+									>
+										<span class="slash-icon" x-text="cmd.icon"></span>
+										<span class="slash-label">
+											<strong x-text="cmd.label"></strong>
+											<small x-text="cmd.hint"></small>
+										</span>
+									</button>
+								</template>
+								<p class="slash-empty muted" x-show="filteredSlashCommands().length === 0">No matching commands</p>
+							</div>
+							<p class="editor-hint muted">Type <kbd>/</kbd> { "for" } commands · <kbd>{ "#" }</kbd> + space { "for" } heading · saves as markdown</p>
+							<textarea id="editor-source" class="editor-source-hidden">{ content }</textarea>
+							<div x-ref="editorMount" class="rich-editor-mount"></div>
+						</div>
+						<div x-ref="previewMount" class="markdown-preview notion-preview" x-show="mode !== 'edit'" x-html="previewHTML"></div>
+					</div>
 				</div>
-			}
-		</div>
-		if note != nil {
-			@NoteMetaPanel(*note)
-		}
-		<div class="editor-pane" :class="'mode-' + mode">
-			<div class="editor-wrap rich-editor-wrap" x-show="mode !== 'preview'">
-				<div class="slash-menu notion-slash" x-show="showSlash" x-cloak @click.outside="closeSlash()">
-					<div class="slash-menu-header">Commands</div>
-					<template x-for="(cmd, i) in filteredSlashCommands()" :key="cmd.id">
-						<button
-							type="button"
-							class="slash-cmd"
-							:class="{ active: slashIndex === i }"
-							@click="runSlashCommand(cmd)"
-						>
-							<span class="slash-icon" x-text="cmd.icon"></span>
-							<span class="slash-label">
-								<strong x-text="cmd.label"></strong>
-								<small x-text="cmd.hint"></small>
-							</span>
-						</button>
-					</template>
-					<p class="slash-empty muted" x-show="filteredSlashCommands().length === 0">No matching commands</p>
-				</div>
-				<p class="editor-hint muted">Type <kbd>/</kbd> { "for" } commands · <kbd>{ "#" }</kbd> + space { "for" } heading · saves as markdown</p>
-				<textarea id="editor-source" class="editor-source-hidden">{ content }</textarea>
-				<div id="rich-editor"></div>
 			</div>
-			<div id="preview" class="markdown-preview notion-preview" x-show="mode !== 'edit'" x-html="previewHTML"></div>
 		</div>
 		if note != nil {
 			<section class="attachments-panel">
@@ -511,9 +525,33 @@ templ ConnectorsPanel(status connectors.Status) {
 	<div class="connectors-view" x-data="connectorsPanel()" x-init="init()">
 		<header class="content-header">
 			<h2>Connectors</h2>
-			<p class="muted">Direct Notion + Google Drive · cached locally in your vault</p>
-			<button type="button" class="primary" @click="syncAll()" :disabled="loading">Sync all now</button>
+			<p class="muted">Pull from a source into your vault, push from your vault to a sink</p>
+			<button type="button" class="primary" @click="syncAll()" :disabled="loading">Sync now</button>
 		</header>
+		<section class="sync-topology">
+			<h3>Sync topology</h3>
+			<p class="muted">Choose one source and one sink. Default: Notion → vault → Google Drive.</p>
+			<div class="sync-topology-grid">
+				<label>
+					Source
+					<select x-model="syncSource" @change="saveSyncTopology()">
+						<option value="notion">Notion</option>
+						<option value="gdrive">Google Drive</option>
+					</select>
+				</label>
+				<div class="sync-arrow" aria-hidden="true">→</div>
+				<div class="sync-hub">vault</div>
+				<div class="sync-arrow" aria-hidden="true">→</div>
+				<label>
+					Sink
+					<select x-model="syncSink" @change="saveSyncTopology()">
+						<option value="gdrive">Google Drive</option>
+						<option value="notion">Notion (coming soon)</option>
+					</select>
+				</label>
+			</div>
+			<p class="muted sync-topology-summary" x-text="topologySummary()"></p>
+		</section>
 		<section class="cache-stats">
 			<p><strong>Local cache</strong> — { formatInt(status.Notion.CachedPages) } Notion pages · { formatInt(status.GDrive.CachedFiles) } Drive files</p>
 			if status.Config.AutoSync {
@@ -522,16 +560,30 @@ templ ConnectorsPanel(status connectors.Status) {
 		</section>
 		<div class="connector-grid">
 			<section class="connector-card">
-				<h3>Notion <span class={ badgeClass(status.Notion.Connected) }>{ connLabel(status.Notion.Connected) }</span></h3>
-				<p>Pulls pages into <code>notes/{ status.Notion.ImportDir }/</code> with incremental cache</p>
+				<h3>
+					Notion <span class={ badgeClass(status.Notion.Connected) }>{ connLabel(status.Notion.Connected) }</span>
+					if status.Config.Source == "notion" {
+						<span class="role-badge source">source</span>
+					} else if status.Config.Sink == "notion" {
+						<span class="role-badge sink">sink</span>
+					}
+				</h3>
+				<p>Pulls pages into <code>notes/{ status.Notion.ImportDir }/</code> when Notion is the source</p>
 				if !status.Notion.LastImport.IsZero() {
 					<p class="muted">Last sync: { status.Notion.LastImport.Format("Jan 2, 15:04") }</p>
 				}
-				<button type="button" @click="importNotion()" :disabled="loading">Sync Notion</button>
+				<button type="button" @click="importNotion()" :disabled="loading">Pull from Notion</button>
 			</section>
 			<section class="connector-card">
-				<h3>Google Drive <span class={ badgeClass(status.GDrive.Connected) }>{ connLabel(status.GDrive.Connected) }</span></h3>
-				<p>Two-way sync — push local edits, pull remote updates into cache</p>
+				<h3>
+					Google Drive <span class={ badgeClass(status.GDrive.Connected) }>{ connLabel(status.GDrive.Connected) }</span>
+					if status.Config.Source == "gdrive" {
+						<span class="role-badge source">source</span>
+					} else if status.Config.Sink == "gdrive" {
+						<span class="role-badge sink">sink</span>
+					}
+				</h3>
+				<p>Pushes local vault files when Drive is the sink; pulls remote updates when Drive is the source</p>
 				if status.GDrive.FolderID != "" {
 					<p class="muted">Folder: { status.GDrive.FolderID }</p>
 				}

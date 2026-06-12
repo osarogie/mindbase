@@ -14,6 +14,20 @@ struct ConnectorsSettingsView: View {
 
     var body: some View {
         Group {
+            Section("Auth API") {
+                Text("OAuth and connector sync use your hosted mindbase server — not local content APIs.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                TextField("https://your-mindbase.example.com", text: $appModel.authAPIBaseURL)
+                    .textFieldStyle(.roundedBorder)
+                Button("Save Auth API URL") {
+                    appModel.applyAuthAPIBaseURL(appModel.authAPIBaseURL)
+                    status = appModel.authAPIBaseURL.isEmpty
+                        ? "Auth API cleared — credentials stay local only"
+                        : "Auth API URL saved"
+                }
+            }
+
             Section("Notion") {
                 if creds.notionTokenSet {
                     Text("Token: \(creds.notionTokenPreview)").foregroundStyle(.secondary)
@@ -35,7 +49,7 @@ struct ConnectorsSettingsView: View {
                 Button("Sign in with Notion") {
                     Task { await startNotionOAuth() }
                 }
-                .disabled(!creds.notionOAuthConfigured)
+                .disabled(!creds.notionOAuthConfigured || AuthAPIClient.configuredBaseURL == nil)
             }
 
             Section("Google Drive") {
@@ -51,7 +65,7 @@ struct ConnectorsSettingsView: View {
                 Button("Sign in with Google") {
                     Task { await startGDriveOAuth() }
                 }
-                .disabled(!creds.googleOAuthConfigured)
+                .disabled(!creds.googleOAuthConfigured || AuthAPIClient.configuredBaseURL == nil)
                 TextEditor(text: $gdriveServiceAccountJSON)
                     .frame(minHeight: 80)
                     .font(.system(.caption, design: .monospaced))
@@ -70,6 +84,13 @@ struct ConnectorsSettingsView: View {
                 }
             }
 
+            Section("Remote sync") {
+                Button("Sync connectors on Auth API") {
+                    Task { await remoteSync() }
+                }
+                .disabled(AuthAPIClient.configuredBaseURL == nil)
+            }
+
             if !status.isEmpty {
                 Section {
                     Text(status).font(.callout).foregroundStyle(.secondary)
@@ -79,14 +100,10 @@ struct ConnectorsSettingsView: View {
         .onAppear {
             Task { await reload() }
         }
-        .onChange(of: appModel.goCoreReady) { _, ready in
-            if ready { Task { await reload() } }
-        }
     }
 
     private func reload() async {
-        guard appModel.goCoreReady else { return }
-        creds = (try? await appModel.fetchCredentials()) ?? .empty
+        creds = (try? appModel.localCredentials()) ?? .empty
     }
 
     private func save(_ fields: [String: String]) async {
@@ -95,9 +112,20 @@ struct ConnectorsSettingsView: View {
             creds = try await appModel.saveCredentials(fields)
             notionToken = ""
             anthropicKey = ""
-            status = "Saved locally in vault/.mindbase/secrets.json"
-            _ = try? await appModel.syncConnectorsNow()
-            try? await appModel.refreshAll()
+            status = "Saved in vault/.mindbase/secrets.json"
+            if AuthAPIClient.configuredBaseURL != nil {
+                status += " · pushed to Auth API"
+            }
+        } catch {
+            status = error.localizedDescription
+        }
+    }
+
+    private func remoteSync() async {
+        status = "Syncing via Auth API…"
+        do {
+            _ = try await appModel.syncConnectorsNow()
+            status = "Remote connector sync complete"
         } catch {
             status = error.localizedDescription
         }
@@ -108,7 +136,7 @@ struct ConnectorsSettingsView: View {
         do {
             let url = try await appModel.gdriveOAuthURL()
             NSWorkspace.shared.open(url)
-            status = "Complete sign-in in your browser, then sync again"
+            status = "Complete sign-in in your browser"
         } catch {
             status = error.localizedDescription
         }
@@ -119,7 +147,7 @@ struct ConnectorsSettingsView: View {
         do {
             let url = try await appModel.notionOAuthURL()
             NSWorkspace.shared.open(url)
-            status = "Complete sign-in in your browser, then sync again"
+            status = "Complete sign-in in your browser"
         } catch {
             status = error.localizedDescription
         }

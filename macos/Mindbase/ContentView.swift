@@ -49,7 +49,7 @@ struct WelcomeView: View {
                 .foregroundStyle(.secondary)
             Text("Welcome to mindbase")
                 .font(.title)
-            Text("Native SwiftUI shell — offline-first vault on disk.")
+            Text("Native SwiftUI — local vault files on disk, git-tracked.")
                 .foregroundStyle(.secondary)
             Text("Select a note or database, or press ⌘N to create one.")
                 .font(.callout)
@@ -67,7 +67,7 @@ struct SettingsView: View {
         TabView {
             Form {
                 TextField("Vault path", text: $path)
-                Button("Apply & Restart Core") {
+                Button("Apply vault path") {
                     Task { await appModel.applyVaultPath(path) }
                 }
             }

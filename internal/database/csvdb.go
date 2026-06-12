@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/osarogie/mindbase/internal/vault"
+	"github.com/osarogie/mindbase/internal/vaultgit"
 )
 
 type Entry struct {
@@ -115,6 +116,7 @@ func (s *Service) Save(name string, headers []string, rows [][]string) (*Table, 
 	if err := w.Error(); err != nil {
 		return nil, err
 	}
+	_ = vaultgit.Track(s.vault.Root, []string{vaultgit.DatabasePath(name)}, "Update database "+name)
 	return s.Get(name)
 }
 
@@ -123,7 +125,11 @@ func (s *Service) Delete(name string) error {
 	if err != nil {
 		return err
 	}
-	return os.Remove(full)
+	if err := os.Remove(full); err != nil {
+		return err
+	}
+	_ = vaultgit.Track(s.vault.Root, []string{vaultgit.DatabasePath(name)}, "Delete database "+name)
+	return nil
 }
 
 func (s *Service) Query(name, filterJSON string) (map[string]any, error) {

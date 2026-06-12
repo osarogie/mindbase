@@ -17,14 +17,30 @@ import (
 
 // SyncBidirectional pushes local changes to Drive and pulls remote updates into the local cache.
 func SyncBidirectional(v *vault.Vault, store *cache.Store, credPath, tokenJSON, folderID string, notes, databases bool) (*SyncResult, error) {
+	return SyncWithMode(v, store, credPath, tokenJSON, folderID, notes, databases, true, true)
+}
+
+func SyncBidirectionalJSON(v *vault.Vault, store *cache.Store, credJSON, tokenJSON, folderID string, notes, databases bool) (*SyncResult, error) {
+	return SyncWithModeJSON(v, store, credJSON, tokenJSON, folderID, notes, databases, true, true)
+}
+
+func SyncPushJSON(v *vault.Vault, store *cache.Store, credJSON, tokenJSON, folderID string, notes, databases bool) (*SyncResult, error) {
+	return SyncWithModeJSON(v, store, credJSON, tokenJSON, folderID, notes, databases, false, true)
+}
+
+func SyncPullJSON(v *vault.Vault, store *cache.Store, credJSON, tokenJSON, folderID string, notes, databases bool) (*SyncResult, error) {
+	return SyncWithModeJSON(v, store, credJSON, tokenJSON, folderID, notes, databases, true, false)
+}
+
+func SyncWithMode(v *vault.Vault, store *cache.Store, credPath, tokenJSON, folderID string, notes, databases, pull, push bool) (*SyncResult, error) {
 	credJSON := credPath
 	if data, err := os.ReadFile(credPath); err == nil {
 		credJSON = string(data)
 	}
-	return SyncBidirectionalJSON(v, store, credJSON, tokenJSON, folderID, notes, databases)
+	return SyncWithModeJSON(v, store, credJSON, tokenJSON, folderID, notes, databases, pull, push)
 }
 
-func SyncBidirectionalJSON(v *vault.Vault, store *cache.Store, credJSON, tokenJSON, folderID string, notes, databases bool) (*SyncResult, error) {
+func SyncWithModeJSON(v *vault.Vault, store *cache.Store, credJSON, tokenJSON, folderID string, notes, databases, pull, push bool) (*SyncResult, error) {
 	if credJSON == "" {
 		return nil, fmt.Errorf("google credentials not configured")
 	}
@@ -54,6 +70,7 @@ func SyncBidirectionalJSON(v *vault.Vault, store *cache.Store, credJSON, tokenJS
 	}
 
 	// Pull: remote → local cache
+	if pull {
 	for rel, remote := range remoteIndex {
 		if !shouldPull(rel, notes, databases) {
 			continue
@@ -90,8 +107,10 @@ func SyncBidirectionalJSON(v *vault.Vault, store *cache.Store, credJSON, tokenJS
 		res.Downloaded++
 		res.Paths = append(res.Paths, rel)
 	}
+	}
 
 	// Push: local → Drive
+	if push {
 	pushIndex := map[string]string{}
 	for rel, id := range idx.GDrive.Files {
 		pushIndex[rel] = id.DriveID
@@ -169,6 +188,7 @@ func SyncBidirectionalJSON(v *vault.Vault, store *cache.Store, credJSON, tokenJS
 			}
 			idx.GDrive.Files[rel] = entry
 		}
+	}
 	}
 
 	idx.GDrive.LastSync = time.Now().UTC()

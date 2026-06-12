@@ -1,0 +1,39 @@
+import { registerWebModule, NativeModule } from 'expo';
+
+class MindbaseNativeModule extends NativeModule {
+  defaultVaultPath(): string {
+    return '/tmp/mindbase-vault';
+  }
+  open(_vaultPath: string): Promise<string> {
+    return Promise.reject(new Error('Mindbase is not available on web'));
+  }
+  vaultSnapshot(): Promise<string> {
+    return Promise.reject(new Error('Mindbase is not available on web'));
+  }
+  getNote(_path: string): Promise<string> {
+    return Promise.reject(new Error('Mindbase is not available on web'));
+  }
+  saveNote(_path: string, _content: string): Promise<string> {
+    return Promise.reject(new Error('Mindbase is not available on web'));
+  }
+  getDatabaseMarkdown(_name: string): Promise<string> {
+    return Promise.reject(new Error('Mindbase is not available on web'));
+  }
+  saveDatabaseMarkdown(_name: string, _content: string): Promise<string> {
+    return Promise.reject(new Error('Mindbase is not available on web'));
+  }
+  search(_query: string): Promise<string> {
+    return Promise.reject(new Error('Mindbase is not available on web'));
+  }
+  previewHtml(_path: string): Promise<string> {
+    return Promise.reject(new Error('Mindbase is not available on web'));
+  }
+  ensureDailyNote(_isoDate: string): Promise<string> {
+    return Promise.reject(new Error('Mindbase is not available on web'));
+  }
+  ensureWeeklyNote(): Promise<string> {
+    return Promise.reject(new Error('Mindbase is not available on web'));
+  }
+}
+
+export default registerWebModule(MindbaseNativeModule, 'Mindbase');

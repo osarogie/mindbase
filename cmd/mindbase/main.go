@@ -1,26 +1,39 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
-	"net"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/osarogie/mindbase/internal/api"
+	"github.com/osarogie/mindbase/internal/cli"
+	"github.com/osarogie/mindbase/internal/httpserver"
 	"github.com/osarogie/mindbase/internal/vault"
 )
 
 func main() {
+	if len(os.Args) > 1 && cli.IsCommand(os.Args[1]) {
+		os.Exit(cli.Run("mindbase", os.Args[1:]))
+	}
+
 	vaultPath := flag.String("vault", "./vault", "Path to vault directory")
-	addr := flag.String("addr", ":8080", "HTTP listen address")
+	addr := flag.String("addr", ":8780", "HTTP listen address")
+	tlsCert := flag.String("tls-cert", "", "TLS certificate file (enables HTTPS and optional HTTP/3)")
+	tlsKey := flag.String("tls-key", "", "TLS private key file")
+	http3 := flag.Bool("http3", true, "Serve HTTP/3 over QUIC when TLS is enabled")
 	webDir := flag.String("web", "", "Legacy React web/dist path (optional; default uses templ UI)")
 	portFile := flag.String("portfile", "", "Write listening address to this file when ready")
 	embed := flag.Bool("embed", false, "Embedded mode for native apps (minimal stderr logging)")
 	flag.Parse()
+
+	if (*tlsCert == "") != (*tlsKey == "") {
+		fmt.Fprintln(os.Stderr, "tls-cert and tls-key must both be set")
+		os.Exit(1)
+	}
 
 	if *embed {
 		log.SetOutput(os.NewFile(0, os.DevNull))
@@ -38,9 +51,19 @@ func main() {
 		os.Exit(1)
 	}
 	defer srv.Close()
-	srv.StartConnectors()
+	srv.SetRuntimeInfo(api.RuntimeInfo{
+		HTTP3: *http3 && *tlsCert != "",
+		TLS:   *tlsCert != "",
+	})
+	// Connector sync is on-demand via POST /api/connectors/sync (no background daemon).
 
-	ln, err := net.Listen("tcp", *addr)
+	ln, err := httpserver.Listen(httpserver.Options{
+		Addr:     *addr,
+		Handler:  srv.Router(),
+		CertFile: *tlsCert,
+		KeyFile:  *tlsKey,
+		HTTP3:    *http3,
+	})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "listen: %v\n", err)
 		os.Exit(1)
@@ -60,12 +83,19 @@ func main() {
 		if *webDir != "" {
 			ui = "legacy-react"
 		}
-		log.Printf("mindbase vault=%s addr=%s ui=%s", v.Root, actual, ui)
+		scheme := "http"
+		if *tlsCert != "" {
+			scheme = "https"
+		}
+		extra := ""
+		if *http3 && *tlsCert != "" {
+			extra = " http3=udp"
+		}
+		log.Printf("mindbase vault=%s addr=%s://%s ui=%s%s", v.Root, scheme, actual, ui, extra)
 	}
 
-	server := &http.Server{Handler: srv.Router()}
 	go func() {
-		if err := server.Serve(ln); err != nil && err != http.ErrServerClosed {
+		for err := range ln.Err() {
 			fmt.Fprintf(os.Stderr, "server: %v\n", err)
 			os.Exit(1)
 		}
@@ -77,4 +107,7 @@ func main() {
 	if !*embed {
 		fmt.Println("\nshutting down...")
 	}
+	ctx, cancel := httpserver.ShutdownContext(context.Background())
+	defer cancel()
+	_ = ln.Shutdown(ctx)
 }

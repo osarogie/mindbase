@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/osarogie/mindbase/internal/vaultgit"
 )
 
 const (
@@ -38,6 +40,7 @@ func Open(root string) (*Vault, error) {
 	if err := v.ensureLayout(); err != nil {
 		return nil, err
 	}
+	_ = vaultgit.Ensure(abs)
 	return v, nil
 }
 

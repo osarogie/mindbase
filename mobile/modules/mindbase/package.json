@@ -1,0 +1,8 @@
+{
+  "name": "mindbase",
+  "version": "0.1.0",
+  "description": "Expo native module — libmindbase vault content API",
+  "main": "index.ts",
+  "types": "index.ts",
+  "private": true
+}

@@ -6,7 +6,7 @@ tmp_dir = "tmp"
   pre_cmd = ["go tool templ generate ./internal/ui/templates/..."]
   cmd = "go build -o ./tmp/main ./cmd/mindbase"
   entrypoint = ["./tmp/main", "-vault", "./vault", "-addr", ":8090"]
-  include_ext = ["go", "templ"]
+  include_ext = ["go", "templ", "js", "css"]
   exclude_dir = [
     "tmp",
     "bin",

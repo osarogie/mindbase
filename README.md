@@ -10,31 +10,51 @@ Local-first notes and data manager — **Go core** + **templ/htmx web** + **nati
 | Databases | `vault/databases/*.csv` |
 | Attachments | `vault/notes/{note}.attachments/` |
 
-## Quick start (web)
+## macOS (libmindbase embedded)
+
+The macOS app embeds **libmindbase** (Go compiled as a C shared library) for all vault content operations — notes, databases, search, markdown preview, and git-tracked saves.
+
+```bash
+make desktop   # builds libmindbase.dylib + mindbase.app
+open macos/build/mindbase.app
+```
+
+Default vault: `~/mindbase-vault` (change in **Settings → Vault**).
+
+For **Notion / Google / Claude OAuth**, configure an **Auth API URL** in **Settings → Connectors** pointing at your hosted mindbase web server. OAuth uses that remote API only.
+
+```
+SwiftUI ──C API──► libmindbase.dylib (Go: notes, DBs, search, preview, git)
+        ──auth──► hosted mindbase API (OAuth, connector sync)
+```
+
+## Mobile (Expo + libmindbase)
+
+The local Expo module `mobile/modules/mindbase` wraps the same C API for iOS and Android. Use a **development build** (`expo-dev-client`) — Expo Go cannot load custom native code.
+
+```bash
+make libmindbase       # macOS dylib + iOS/Android libs when SDKs available
+make mobile-prebuild   # build native libs + expo prebuild
+pnpm mobile:ios        # or pnpm mobile:android
+pnpm mobile:start      # Metro for dev client
+```
+
+Vault path on device defaults to the app documents directory (`…/mindbase-vault`). Content is managed entirely by **libmindbase** — no local HTTP server.
+
+```
+React Native ──Expo module──► libmindbase (Go: notes, DBs, search, preview, git)
+```
+
+## Web server (content + UI)
+
+The Go server powers the **web client** only. Run it when you want the browser UI or remote auth endpoints:
 
 ```bash
 make build && make run
 # → http://localhost:8080
 ```
 
-## macOS (native SwiftUI + Go core)
-
-The macOS app is a **native SwiftUI shell** that embeds and launches the Go binary (`mindbase -embed -portfile …`). All vault logic stays in Go; SwiftUI talks to it over localhost HTTP.
-
-```bash
-make desktop
-open macos/build/mindbase.app
-```
-
-Default vault: `~/mindbase-vault` (change in **Settings**).
-
-Architecture:
-
-```
-SwiftUI (lists, editor, preview) ──HTTP──► Go core (vault, search, sync, markdown)
-                     ▲
-                     └── embedded bin/mindbase in app Resources
-```
+Connector sync is **on-demand** (`POST /api/connectors/sync`) — no background daemon.
 
 ## Package manager (pnpm)
 
@@ -43,7 +63,8 @@ This repo uses **pnpm workspaces** for mobile and legacy web:
 ```bash
 pnpm install          # or: make pnpm-install
 pnpm web:dev          # legacy React UI
-pnpm mobile:sync      # Capacitor sync
+pnpm mobile:prebuild  # Expo prebuild (after libmindbase)
+pnpm mobile:start     # Metro dev client
 ```
 
 ## Features
@@ -114,7 +135,33 @@ Connector config is stored at `vault/.mindbase/connectors.json` (env var names o
 make tools            # verify pinned Go tools (air, templ)
 make dev              # hot reload with air → http://localhost:8090
 make run              # production binary → http://localhost:8080
+make cli              # agent CLI → bin/mind
+make install-cli      # install mind to ~/.local/bin
 ```
+
+### Agent CLI (`mind` / `mindbase`)
+
+Git-style history and vault queries for agents. Build with `make cli` or use subcommands on the server binary:
+
+```bash
+export MINDBASE_VAULT=./vault   # optional, default ./vault
+
+mind log --oneline -n 10        # commit history
+mind show HEAD                  # patch for a commit
+mind status                     # working tree
+mind diff                       # unstaged changes
+mind snapshot --json            # vault inventory for agents
+mind search "welcome" --json
+mind note list
+mind note get welcome.md
+
+# Same commands on the server binary:
+./bin/mindbase log --oneline
+```
+
+Install `mind` globally: `make install-cli`. Optional shell alias: `alias mindbase=mind`.
+
+Use `--json` on any command for structured agent output.
 
 Go tools are pinned in `go.mod`:
 
@@ -127,10 +174,11 @@ tool (
 
 Run directly: `go tool air`, `go tool templ generate ./internal/ui/templates/...`
 
-## Mobile (Capacitor)
+## Mobile (Expo)
 
 ```bash
-make mobile-sync
+make libmindbase
+make mobile-prebuild
 pnpm mobile:ios       # or pnpm mobile:android
 ```
 

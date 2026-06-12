@@ -2,24 +2,32 @@
   "name": "mindbase-mobile",
   "version": "0.1.0",
   "private": true,
+  "main": "index.ts",
   "packageManager": "pnpm@10.12.1",
   "scripts": {
-    "sync": "cap sync",
-    "ios": "cap open ios",
-    "android": "cap open android"
+    "start": "expo start --dev-client",
+    "start:clean": "expo start --dev-client --clear",
+    "ios": "expo run:ios --device \"iPhone 17\"",
+    "android": "expo run:android",
+    "prebuild": "expo prebuild",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@capacitor/android": "^7.0.0",
-    "@capacitor/core": "^7.0.0",
-    "@capacitor/ios": "^7.0.0",
-    "@capacitor/splash-screen": "^7.0.0",
-    "@capacitor/status-bar": "^7.0.0"
+    "@expo/vector-icons": "^15.1.1",
+    "expo": "~56.0.11",
+    "expo-dev-client": "~56.0.8",
+    "expo-haptics": "^56.0.3",
+    "expo-status-bar": "~56.0.4",
+    "marked": "^18.0.5",
+    "mindbase": "file:./modules/mindbase",
+    "react": "19.2.3",
+    "react-native": "0.85.3",
+    "react-native-safe-area-context": "~5.6.0",
+    "react-native-webview": "13.16.1"
   },
   "devDependencies": {
-    "@capacitor/cli": "^7.0.0",
-    "typescript": "^5.7.2"
-  },
-  "capacitor": {
-    "platforms": ["ios", "android"]
+    "@babel/core": "^7.26.0",
+    "@types/react": "~19.2.2",
+    "typescript": "~6.0.3"
   }
 }

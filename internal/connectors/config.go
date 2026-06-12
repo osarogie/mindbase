@@ -2,8 +2,11 @@ package connectors
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/osarogie/mindbase/internal/ai"
@@ -11,6 +14,17 @@ import (
 )
 
 const ConfigFile = "connectors.json"
+
+const (
+	ConnectorNotion = "notion"
+	ConnectorGDrive = "gdrive"
+)
+
+var (
+	ErrSourceSinkSame     = errors.New("source and sink must be different connectors")
+	ErrUnknownConnector   = errors.New("unknown connector")
+	ErrNotionSinkUnsupported = errors.New("notion as sink is not supported yet")
+)
 
 type NotionConfig struct {
 	Enabled         bool      `json:"enabled"`
@@ -35,6 +49,8 @@ type Config struct {
 	Notion           NotionConfig `json:"notion"`
 	GDrive           GDriveConfig `json:"gdrive"`
 	AI               ai.Config    `json:"ai"`
+	Source           string       `json:"source"`
+	Sink             string       `json:"sink"`
 	AutoSync         bool         `json:"auto_sync"`
 	SyncIntervalMin  int          `json:"sync_interval_min"`
 	Version          int          `json:"version"`
@@ -43,6 +59,8 @@ type Config struct {
 func DefaultConfig() Config {
 	return Config{
 		Version:         1,
+		Source:          ConnectorNotion,
+		Sink:            ConnectorGDrive,
 		AutoSync:        true,
 		SyncIntervalMin: 15,
 		Notion: NotionConfig{
@@ -82,6 +100,7 @@ func Load(v *vault.Vault) (Config, error) {
 		return DefaultConfig(), err
 	}
 	cfg = normalizeConfig(cfg)
+	cfg = normalizeSourceSink(cfg)
 	if cfg.Version == 0 {
 		cfg.Version = 1
 	}
@@ -123,32 +142,90 @@ func normalizeConfig(cfg Config) Config {
 	return cfg
 }
 
+func normalizeSourceSink(cfg Config) Config {
+	cfg.Source = normalizeConnectorID(cfg.Source)
+	cfg.Sink = normalizeConnectorID(cfg.Sink)
+	if cfg.Source == "" && cfg.Sink == "" {
+		cfg.Source = ConnectorNotion
+		cfg.Sink = ConnectorGDrive
+	}
+	if cfg.Source == "" {
+		cfg.Source = defaultSourceForSink(cfg.Sink)
+	}
+	if cfg.Sink == "" {
+		cfg.Sink = defaultSinkForSource(cfg.Source)
+	}
+	cfg = applyRoleEnabled(cfg)
+	return cfg
+}
+
+func normalizeConnectorID(id string) string {
+	switch strings.ToLower(strings.TrimSpace(id)) {
+	case ConnectorNotion:
+		return ConnectorNotion
+	case ConnectorGDrive, "google", "google_drive":
+		return ConnectorGDrive
+	default:
+		return ""
+	}
+}
+
+func defaultSourceForSink(sink string) string {
+	if sink == ConnectorNotion {
+		return ConnectorGDrive
+	}
+	return ConnectorNotion
+}
+
+func defaultSinkForSource(source string) string {
+	if source == ConnectorGDrive {
+		return ConnectorNotion
+	}
+	return ConnectorGDrive
+}
+
+func applyRoleEnabled(cfg Config) Config {
+	cfg.Notion.Enabled = cfg.ConnectorEnabled(ConnectorNotion)
+	cfg.GDrive.Enabled = cfg.ConnectorEnabled(ConnectorGDrive)
+	cfg.Notion.AutoSync = cfg.Notion.Enabled
+	cfg.GDrive.AutoSync = cfg.GDrive.Enabled
+	return cfg
+}
+
+func (cfg Config) ConnectorEnabled(id string) bool {
+	return cfg.Source == id || cfg.Sink == id
+}
+
+func ValidateSourceSink(cfg Config) error {
+	if raw := strings.TrimSpace(cfg.Source); raw != "" && normalizeConnectorID(raw) == "" {
+		return fmt.Errorf("%w: source %q", ErrUnknownConnector, raw)
+	}
+	if raw := strings.TrimSpace(cfg.Sink); raw != "" && normalizeConnectorID(raw) == "" {
+		return fmt.Errorf("%w: sink %q", ErrUnknownConnector, raw)
+	}
+	cfg = normalizeSourceSink(cfg)
+	if cfg.Source == "" || cfg.Sink == "" {
+		return fmt.Errorf("%w: set both source and sink", ErrUnknownConnector)
+	}
+	if cfg.Source == cfg.Sink {
+		return ErrSourceSinkSame
+	}
+	if cfg.Sink == ConnectorNotion {
+		return ErrNotionSinkUnsupported
+	}
+	return nil
+}
+
 func applyCredentialDefaults(v *vault.Vault, cfg Config) (Config, bool) {
-	changed := false
 	creds := resolveCredentials(v, cfg)
-	if creds.NotionToken != "" {
-		if !cfg.Notion.Enabled {
-			cfg.Notion.Enabled = true
+	prevSource, prevSink := cfg.Source, cfg.Sink
+	cfg = normalizeSourceSink(cfg)
+	changed := cfg.Source != prevSource || cfg.Sink != prevSink
+	if creds.NotionToken != "" || creds.GDriveCredJSON != "" {
+		if !cfg.AutoSync {
+			cfg.AutoSync = true
 			changed = true
 		}
-		if !cfg.Notion.AutoSync {
-			cfg.Notion.AutoSync = true
-			changed = true
-		}
-	}
-	if creds.GDriveCredJSON != "" {
-		if !cfg.GDrive.Enabled {
-			cfg.GDrive.Enabled = true
-			changed = true
-		}
-		if !cfg.GDrive.AutoSync {
-			cfg.GDrive.AutoSync = true
-			changed = true
-		}
-	}
-	if (cfg.Notion.Enabled || cfg.GDrive.Enabled) && !cfg.AutoSync {
-		cfg.AutoSync = true
-		changed = true
 	}
 	return cfg, changed
 }

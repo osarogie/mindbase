@@ -7,8 +7,8 @@
     "import_dir": "notion"
   },
   "gdrive": {
-    "enabled": false,
-    "auto_sync": false,
+    "enabled": true,
+    "auto_sync": true,
     "credentials_env": "GOOGLE_APPLICATION_CREDENTIALS",
     "token_env": "GDRIVE_TOKEN",
     "folder_id": "",
@@ -24,6 +24,8 @@
     "model": "claude-sonnet-4-20250514",
     "max_tokens": 4096
   },
+  "source": "notion",
+  "sink": "gdrive",
   "auto_sync": true,
   "sync_interval_min": 15,
   "version": 1

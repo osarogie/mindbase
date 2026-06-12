@@ -16,6 +16,8 @@ import { HeadingNode, QuoteNode } from '@lexical/rich-text'
 import { useEffect } from 'react'
 import { BridgePlugin, registerEditorInstance } from './BridgePlugin'
 import { MINDBASE_TRANSFORMERS } from './markdown/mindbaseTransformers'
+import { FileCardNode } from './nodes/FileCardNode'
+import { ImageNode } from './nodes/ImageNode'
 import { MINDBASE_TOKEN_NODES } from './nodes/mindbaseTokenNodes'
 import { SlashCommandPlugin } from './plugins/SlashCommandPlugin'
 import { FloatingToolbarPlugin } from './plugins/FloatingToolbarPlugin'
@@ -56,6 +58,8 @@ export function EditorApp({ initialMarkdown, documentKind = 'note' }: Props) {
           CodeNode,
           CodeHighlightNode,
           LinkNode,
+          ImageNode,
+          FileCardNode,
           ...MINDBASE_TOKEN_NODES,
         ],
         editorState: initialMarkdown

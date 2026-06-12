@@ -1,6 +1,6 @@
 import { createHeadlessEditor } from '@lexical/headless'
 import { $convertFromMarkdownString, $convertToMarkdownString } from '@lexical/markdown'
-import { $getRoot, type ElementNode, type LexicalNode } from 'lexical'
+import { $createParagraphNode, $getRoot, type ElementNode, type LexicalNode } from 'lexical'
 import { describe, expect, it } from 'vitest'
 import { HeadingNode, QuoteNode } from '@lexical/rich-text'
 import { ListItemNode, ListNode } from '@lexical/list'
@@ -8,7 +8,7 @@ import { CodeHighlightNode, CodeNode } from '@lexical/code'
 import { LinkNode } from '@lexical/link'
 import { MINDBASE_TOKEN_NODES } from '../nodes/mindbaseTokenNodes'
 import { ImageNode, $isImageNode } from '../nodes/ImageNode'
-import { FileCardNode, $isFileCardNode } from '../nodes/FileCardNode'
+import { FileCardNode, $isFileCardNode, $createFileCardNode } from '../nodes/FileCardNode'
 import { MINDBASE_TRANSFORMERS } from './mindbaseTransformers'
 
 import type { LexicalEditor } from 'lexical'
@@ -57,15 +57,73 @@ describe('attachment embed transformer', () => {
     expect(out).toBe(md)
   })
 
-  it('labels a file card by decoded filename when alt is empty', () => {
-    const { nodes, editor } = roundTrip('![](welcome.attachments/My%20Doc.pdf)')
+  it('keeps empty-alt file embeds byte-stable without label enrichment', () => {
+    // Regression (I2): enriching the label rewrote the user's markdown on save.
+    const md = '![](welcome.attachments/My%20Doc.pdf)'
+    const first = roundTrip(md)
     let label: string | undefined
-    editor.getEditorState().read(() => {
-      const card = nodes.find((n) => $isFileCardNode(n))
+    first.editor.getEditorState().read(() => {
+      const card = first.nodes.find((n) => $isFileCardNode(n))
       expect(card).toBeDefined()
       label = (card as FileCardNode).getLabel()
     })
-    expect(label).toBe('My Doc.pdf')
+    expect(label).toBe('')
+    expect(first.out).toBe(md)
+    const second = roundTrip(first.out)
+    expect(second.out).toBe(md)
+  })
+
+  it('round-trips titled images byte-identically as ImageNode', () => {
+    // Regression (C2): the title made EMBED_IMPORT fail, so the LINK
+    // transformer claimed it and rewrote the relative src to https://…
+    const md = '![a](welcome.attachments/b.png "my title")'
+    const first = roundTrip(md)
+    expect(first.nodes.some((n) => $isImageNode(n))).toBe(true)
+    expect(first.out).toBe(md)
+    const second = roundTrip(first.out)
+    expect(second.nodes.some((n) => $isImageNode(n))).toBe(true)
+    expect(second.out).toBe(md)
+  })
+
+  it('keeps src stable across cycles when the label contains brackets', () => {
+    // Regression (C1): a `]` in the label made the exported markdown
+    // unparseable; on re-import the LINK transformer destroyed the path.
+    const editor = createHeadlessEditor({
+      namespace: 'test',
+      nodes: [
+        HeadingNode, QuoteNode, ListNode, ListItemNode, CodeNode, CodeHighlightNode, LinkNode,
+        ImageNode, FileCardNode, ...MINDBASE_TOKEN_NODES,
+      ],
+      onError: (e) => { throw e },
+    })
+    editor.update(() => {
+      const p = $createParagraphNode()
+      p.append($createFileCardNode('welcome.attachments/a%5Db.pdf', 'a]b.pdf'))
+      $getRoot().append(p)
+    }, { discrete: true })
+    let md = ''
+    editor.getEditorState().read(() => {
+      md = $convertToMarkdownString(MINDBASE_TRANSFORMERS)
+    })
+
+    const first = roundTrip(md)
+    let firstSrc: string | undefined
+    first.editor.getEditorState().read(() => {
+      const card = first.nodes.find((n) => $isFileCardNode(n))
+      expect(card).toBeDefined()
+      firstSrc = (card as FileCardNode).getSrc()
+    })
+    expect(firstSrc).toBe('welcome.attachments/a%5Db.pdf')
+
+    const second = roundTrip(first.out)
+    let secondSrc: string | undefined
+    second.editor.getEditorState().read(() => {
+      const card = second.nodes.find((n) => $isFileCardNode(n))
+      expect(card).toBeDefined()
+      secondSrc = (card as FileCardNode).getSrc()
+    })
+    expect(secondSrc).toBe('welcome.attachments/a%5Db.pdf')
+    expect(second.out).toBe(first.out)
   })
 
   it('reads legacy bare filenames', () => {

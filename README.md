@@ -1,171 +1,172 @@
 # mindbase
 
-Local-first notes and data manager — **Go core** + **templ/htmx web** + **native SwiftUI macOS**.
+Local-first notes and data manager — **Go core** (`libmindbase`) with **templ/htmx web**, **SwiftUI macOS**, and **Expo mobile**.
+
+Every save is git-tracked in the vault. Notes are plain markdown; databases are CSV; attachments stay on disk.
+
+## Quick start
+
+```bash
+make dev                  # hot reload → http://localhost:8090
+# open a note, edit, save — commits land in vault/.git
+
+make build && make run    # production binary → http://localhost:8780
+make cli                  # agent CLI → bin/mind
+```
+
+Default vault for development: `./vault`. Override with `-vault` or `MINDBASE_VAULT`.
 
 ## Storage
 
 | Type | Location |
 |------|----------|
-| Notes | `vault/notes/*.md` |
-| Databases | `vault/databases/*.csv` |
+| Notes | `vault/notes/**/*.md` |
+| Databases | `vault/databases/**/*.csv` |
 | Attachments | `vault/notes/{note}.attachments/` |
+| Git history | `vault/.git` (auto-init on first save) |
+| Connector config | `vault/.mindbase/connectors.json` |
+| Secrets | `vault/.mindbase/secrets.json` (gitignored) |
+
+## Web UI
+
+The default UI is **templ + htmx + Alpine** (no Node build required for the main app).
+
+- **Paper light** design — warm paper palette, Literata serif for reading, centered page column
+- **Sepia dark** — follows `prefers-color-scheme: dark`
+- **Edit / Split / Preview** modes, `/` slash commands, format toolbar
+- **History** panel — browse and restore prior git versions per note
+- **✦ AI** floating panel — vault-aware Claude assistant
+- Mermaid diagrams, Excalidraw embeds, wiki links, database embeds
+
+Design reference: [`docs/UI-DESIGN-BRIEF.md`](docs/UI-DESIGN-BRIEF.md)
+
+```bash
+make dev      # :8090 — air hot reload (go, templ, js, css)
+make run      # :8780 — embedded static assets
+```
+
+Legacy React UI (optional): `pnpm web:dev` then `make run -web web/dist`.
+
+## Version history
+
+Saves call `git add` + `git commit` automatically. Browse history in the web UI (**History** button on any note) or via CLI/API:
+
+```bash
+mind log --oneline -n 20 notes/welcome.md
+mind show HEAD
+mind diff notes/welcome.md
+```
+
+| Endpoint | Purpose |
+|----------|---------|
+| `GET /api/history?path=notes/welcome.md&limit=30` | Commits touching a file |
+| `GET /api/history/{rev}?path=notes/welcome.md` | File snapshot at revision |
 
 ## macOS (libmindbase embedded)
 
-The macOS app embeds **libmindbase** (Go compiled as a C shared library) for all vault content operations — notes, databases, search, markdown preview, and git-tracked saves.
+The macOS app embeds **libmindbase** (Go as a C shared library) for vault operations — notes, databases, search, markdown preview, and git-tracked saves.
 
 ```bash
-make desktop   # builds libmindbase.dylib + mindbase.app
+make desktop
 open macos/build/mindbase.app
 ```
 
 Default vault: `~/mindbase-vault` (change in **Settings → Vault**).
 
-For **Notion / Google / Claude OAuth**, configure an **Auth API URL** in **Settings → Connectors** pointing at your hosted mindbase web server. OAuth uses that remote API only.
+For **Notion / Google / Claude OAuth**, set an **Auth API URL** in **Settings → Connectors** pointing at your hosted mindbase web server.
 
 ```
-SwiftUI ──C API──► libmindbase.dylib (Go: notes, DBs, search, preview, git)
+SwiftUI ──C API──► libmindbase.dylib (notes, DBs, search, preview, git)
         ──auth──► hosted mindbase API (OAuth, connector sync)
 ```
 
 ## Mobile (Expo + libmindbase)
 
-The local Expo module `mobile/modules/mindbase` wraps the same C API for iOS and Android. Use a **development build** (`expo-dev-client`) — Expo Go cannot load custom native code.
+The Expo module `mobile/modules/mindbase` wraps the same C API for iOS and Android. Requires a **development build** — Expo Go cannot load custom native code.
 
 ```bash
-make libmindbase       # macOS dylib + iOS/Android libs when SDKs available
-make mobile-prebuild   # build native libs + expo prebuild
+make libmindbase
+make mobile-prebuild
 pnpm mobile:ios        # or pnpm mobile:android
 pnpm mobile:start      # Metro for dev client
 ```
 
-Vault path on device defaults to the app documents directory (`…/mindbase-vault`). Content is managed entirely by **libmindbase** — no local HTTP server.
-
-```
-React Native ──Expo module──► libmindbase (Go: notes, DBs, search, preview, git)
-```
-
-## Web server (content + UI)
-
-The Go server powers the **web client** only. Run it when you want the browser UI or remote auth endpoints:
-
-```bash
-make build && make run
-# → http://localhost:8780
-
-make dev
-# → http://localhost:8090 (hot reload)
-```
-
-Connector sync is **on-demand** (`POST /api/connectors/sync`) — no background daemon.
-
-## Package manager (pnpm)
-
-This repo uses **pnpm workspaces** for mobile and legacy web:
-
-```bash
-pnpm install          # or: make pnpm-install
-pnpm web:dev          # legacy React UI
-pnpm mobile:prebuild  # Expo prebuild (after libmindbase)
-pnpm mobile:start     # Metro dev client
-```
+Vault on device: app documents directory (`…/mindbase-vault`). No local HTTP server.
 
 ## Features
 
 - Wiki links `[[note|label]]`, database embeds `[[db:name]]`, cross-page CSV links
-- Full-text search (`/api/search`)
-- Mermaid + Excalidraw (web templ UI; macOS preview via WKWebView + Mermaid CDN)
+- Tags `#tag`, tasks `- [ ]`, scheduled tasks `>today`, mentions `@context`
+- Journal pages (`/journal/today`, weekly views)
+- Full-text search (`/api/search`, sidebar search)
+- Mermaid + Excalidraw (web; macOS preview via WKWebView)
 - Sync API (`/api/sync/changes`, `/pull`, `/push`)
-- **Notion-like UX** — page titles, breadcrumbs, `/` slash commands, floating AI panel
-- **Notion source** — direct API sync into `vault/notes/notion/` with incremental cache
-- **Google Drive** — bidirectional sync (push local changes, pull remote updates)
-- **Local cache** — `vault/.mindbase/cache/index.json` tracks Notion page IDs and Drive file mappings
-- **Claude AI** — vault-aware assistant with **Headroom** token compression + **RTK** context compression
+- **Notion** — import into `vault/notes/notion/` with incremental cache
+- **Google Drive** — bidirectional sync
+- **Claude AI** — Headroom token compression + RTK context compression (optional)
 
-## Connectors setup
+### Slash commands (web editor)
 
-Configure via the **Connect** panel in the UI, macOS **Settings → Connectors**, env vars, or an env file:
+Type `/` in the editor: headings, lists, tasks, quotes, code, tables, dividers, links, images, callouts, frontmatter, wiki links, database embeds, mermaid.
+
+## Connectors
+
+Configure via **Connect** in the sidebar, macOS **Settings → Connectors**, env vars, or `~/.mindbase/env`:
 
 ```bash
-# Option A: UI — paste tokens in Connectors panel (stored in vault/.mindbase/secrets.json)
+# UI — paste tokens in Connectors panel → vault/.mindbase/secrets.json
 
-# Option B: shell env vars
+# Shell
 export NOTION_TOKEN=secret_...
 export GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
 
-# Option C: env file (works when launching mindbase.app from Finder)
+# Env file (Finder launches)
 mkdir -p ~/.mindbase
 cp vault/.mindbase/env.example ~/.mindbase/env
 ```
 
-**SSO:** Save a Google OAuth client JSON in the UI, then click **Sign in with Google**. For Notion OAuth, save client ID/secret then **Sign in with Notion**. Register redirect URIs in each provider console:
+**OAuth redirect URIs** (adjust port if needed):
+
 - `http://127.0.0.1:8780/api/connectors/gdrive/oauth/callback`
 - `http://127.0.0.1:8780/api/connectors/notion/oauth/callback`
-(use your actual mindbase port if different)
 
-# Optional: Headroom proxy for 60–90% token savings on AI calls
-pip install "headroom-ai[proxy]"
-headroom proxy --port 8787
+**Optional AI compression:**
 
-# Optional: RTK for compressing vault context before Claude
+```bash
+pip install "headroom-ai[proxy]" && headroom proxy --port 8787
 brew install rtk
 ```
 
-Open **Connect** in the sidebar or visit `/connectors`. Use the **✦** button for Claude chat on any page.
-
-**How sync works**
-
-1. The app loads notes from the local vault immediately (offline-first).
-2. When credentials are set, the Go core connects directly to Notion and Google Drive APIs.
-3. Changed Notion pages are pulled into `notes/notion/`; only pages edited since last sync are re-fetched.
-4. Google Drive sync is bidirectional — local edits upload, remote changes download into the vault cache.
-5. Auto-sync runs every 15 minutes (configurable in `connectors.json`). macOS triggers sync when the embedded Go core starts.
-
-API endpoints:
+**Sync flow:** local vault loads immediately (offline-first). When credentials are set, Notion pages pull into `notes/notion/` and Drive syncs bidirectionally. Auto-sync defaults to every 15 minutes (`connectors.json`).
 
 | Endpoint | Purpose |
 |----------|---------|
 | `POST /api/connectors/sync` | Sync Notion + Drive + refresh cache |
-| `GET /api/connectors/cache` | Cache stats (page/file counts, last sync times) |
-| `POST /api/connectors/notion/import` | Notion-only sync |
-| `POST /api/connectors/gdrive/sync` | Drive-only sync |
-
-Connector config is stored at `vault/.mindbase/connectors.json` (env var names only, no secrets).
+| `GET /api/connectors/cache` | Cache stats |
+| `POST /api/connectors/notion/import` | Notion-only |
+| `POST /api/connectors/gdrive/sync` | Drive-only |
 
 ## Development
 
 ```bash
 make tools            # verify pinned Go tools (air, templ)
-make dev              # hot reload with air → http://localhost:8090
-make run              # production binary → http://localhost:8780
 make dev              # hot reload → http://localhost:8090
-make cli              # agent CLI → bin/mind
+make run              # production binary → http://localhost:8780
+make build            # compile bin/mindbase (runs templ generate)
+make cli              # bin/mind agent CLI
 make install-cli      # install mind to ~/.local/bin
+make templ            # regenerate internal/ui/templates/*_templ.go
+make desktop          # macOS app + libmindbase.dylib
+make libmindbase      # build C shared library for native targets
 ```
 
-### Agent CLI (`mind` / `mindbase`)
-
-Git-style history and vault queries for agents. Build with `make cli` or use subcommands on the server binary:
+### Server flags
 
 ```bash
-export MINDBASE_VAULT=./vault   # optional, default ./vault
-
-mind log --oneline -n 10        # commit history
-mind show HEAD                  # patch for a commit
-mind status                     # working tree
-mind diff                       # unstaged changes
-mind snapshot --json            # vault inventory for agents
-mind search "welcome" --json
-mind note list
-mind note get welcome.md
-
-# Same commands on the server binary:
-./bin/mindbase log --oneline
+./bin/mindbase -vault ./vault -addr :8780
+./bin/mindbase -tls-cert cert.pem -tls-key key.pem   # HTTPS + HTTP/3 (QUIC)
+./bin/mindbase log --oneline                         # CLI subcommands on same binary
 ```
-
-Install `mind` globally: `make install-cli`. Optional shell alias: `alias mindbase=mind`.
-
-Use `--json` on any command for structured agent output.
 
 Go tools are pinned in `go.mod`:
 
@@ -176,14 +177,36 @@ tool (
 )
 ```
 
-Run directly: `go tool air`, `go tool templ generate ./internal/ui/templates/...`
+### Agent CLI (`mind` / `mindbase`)
 
-## Mobile (Expo)
+Git-style vault queries for agents and scripts:
 
 ```bash
-make libmindbase
-make mobile-prebuild
-pnpm mobile:ios       # or pnpm mobile:android
+export MINDBASE_VAULT=./vault
+
+mind log --oneline -n 10 notes/welcome.md
+mind show HEAD
+mind status
+mind diff
+mind snapshot --json
+mind search "welcome" --json
+mind note list
+mind note get welcome.md
 ```
 
-MIT License
+Install globally: `make install-cli`. Use `--json` on any command for structured output.
+
+## Package manager (pnpm)
+
+pnpm workspaces cover mobile and the legacy React web UI:
+
+```bash
+pnpm install
+pnpm web:dev
+pnpm mobile:prebuild
+pnpm mobile:start
+```
+
+## License
+
+MIT

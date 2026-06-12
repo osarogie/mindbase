@@ -59,7 +59,7 @@ export function NoteEditor({ note, content, dirty, saving, onBack, onChange, onS
     <KeyboardAvoidingView
       style={styles.root}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
       <View style={styles.topBar}>
         <View style={styles.topLeft}>

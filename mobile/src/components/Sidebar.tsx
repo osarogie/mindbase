@@ -77,7 +77,11 @@ export function Sidebar({
       <FlatList
         data={items}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={[styles.listContent, items.length === 0 && styles.listContentEmpty]}
+        contentContainerStyle={[
+          styles.listContent,
+          items.length === 0 && styles.listContentEmpty,
+          { paddingBottom: spacing.xl * 2 + (showFab ? 72 : 0) },
+        ]}
         keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />
@@ -122,7 +126,11 @@ export function Sidebar({
       {showFab ? (
         <Pressable
           onPress={onNewPage}
-          style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
+          style={({ pressed }) => [
+            styles.fab,
+            { bottom: spacing.lg },
+            pressed && styles.fabPressed,
+          ]}
           accessibilityRole="button"
           accessibilityLabel="New page"
         >
@@ -196,7 +204,6 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: spacing.sm,
-    paddingBottom: spacing.xl * 2,
   },
   listContentEmpty: {
     flexGrow: 1,
@@ -262,7 +269,6 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: spacing.lg,
-    bottom: spacing.lg,
     width: 56,
     height: 56,
     borderRadius: 28,

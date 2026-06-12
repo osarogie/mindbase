@@ -9,8 +9,6 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import {
   defaultVaultPath,
@@ -26,11 +24,32 @@ import {
 import { Sidebar } from './Sidebar';
 import { NoteEditor } from './NoteEditor';
 import { EmptyState } from './EmptyState';
+import { ScreenShell } from './ScreenShell';
 import { newPagePath, todayISO } from '../utils/noteContent';
 import { useDebouncedEffect } from '../hooks/useDebouncedEffect';
 import { colors, spacing } from '../theme';
 
 type Screen = 'list' | 'editor';
+
+function agentLog(location: string, message: string, data: Record<string, unknown>) {
+  const payload = {
+    sessionId: 'c2f09c',
+    runId: 'mobile-safe-area-postfix',
+    hypothesisId: 'H2',
+    location,
+    message,
+    data,
+    timestamp: Date.now(),
+  };
+  // #region agent log
+  console.warn('[mindbase-safe-area]', JSON.stringify(payload));
+  fetch('http://127.0.0.1:7546/ingest/bcd2e86e-9863-4285-b3d0-4efb7b8d0335', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'c2f09c' },
+    body: JSON.stringify(payload),
+  }).catch(() => {});
+  // #endregion
+}
 
 export function VaultApp() {
   const { width } = useWindowDimensions();
@@ -241,8 +260,15 @@ export function VaultApp() {
   const showEditor = isWide || screen === 'editor';
 
   return (
-    <SafeAreaView style={styles.root} edges={['top', 'left', 'right']}>
-      <StatusBar style="dark" />
+    <ScreenShell
+      onLayoutMetrics={(data) => {
+        agentLog('ScreenShell.tsx:layout', 'content layout metrics', {
+          ...data,
+          isWide,
+          screen,
+        });
+      }}
+    >
       {error ? (
         <View style={styles.errorBar}>
           <Text style={styles.errorText} numberOfLines={2}>
@@ -308,15 +334,11 @@ export function VaultApp() {
           <ActivityIndicator size="large" color={colors.accent} />
         </View>
       ) : null}
-    </SafeAreaView>
+    </ScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.bg,
-  },
   errorBar: {
     backgroundColor: '#FDEDED',
     paddingHorizontal: spacing.lg,

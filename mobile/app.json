@@ -10,7 +10,10 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.osarogie.mindbase"
+      "bundleIdentifier": "com.osarogie.mindbase",
+      "infoPlist": {
+        "UIViewControllerBasedStatusBarAppearance": true
+      }
     },
     "android": {
       "package": "com.osarogie.mindbase",

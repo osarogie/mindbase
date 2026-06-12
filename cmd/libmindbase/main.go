@@ -175,6 +175,67 @@ func mindbase_ensure_weekly_note() *C.char {
 	return jsonReply(map[string]string{"path": path}, err)
 }
 
+//export mindbase_note_history
+func mindbase_note_history(path *C.char, limit C.int) *C.char {
+	mu.Lock()
+	e := eng
+	mu.Unlock()
+	if e == nil {
+		return jsonReply(nil, errNotOpen)
+	}
+	hist, err := e.NoteHistory(C.GoString(path), int(limit))
+	return jsonReply(hist, err)
+}
+
+//export mindbase_note_at_rev
+func mindbase_note_at_rev(path *C.char, rev *C.char) *C.char {
+	mu.Lock()
+	e := eng
+	mu.Unlock()
+	if e == nil {
+		return jsonReply(nil, errNotOpen)
+	}
+	content, err := e.NoteAtRev(C.GoString(path), C.GoString(rev))
+	if err != nil {
+		return jsonReply(nil, err)
+	}
+	return jsonReply(map[string]string{
+		"path":    C.GoString(path),
+		"rev":     C.GoString(rev),
+		"content": content,
+	}, nil)
+}
+
+//export mindbase_wysiwyg_page
+func mindbase_wysiwyg_page(path *C.char, content *C.char) *C.char {
+	mu.Lock()
+	e := eng
+	mu.Unlock()
+	if e == nil {
+		return jsonReply(nil, errNotOpen)
+	}
+	html, err := e.RenderWysiwygPage(C.GoString(path), C.GoString(content))
+	if err != nil {
+		return jsonReply(nil, err)
+	}
+	return jsonReply(map[string]string{"html": html}, nil)
+}
+
+//export mindbase_html_to_markdown
+func mindbase_html_to_markdown(html *C.char) *C.char {
+	mu.Lock()
+	e := eng
+	mu.Unlock()
+	if e == nil {
+		return jsonReply(nil, errNotOpen)
+	}
+	md, err := e.HTMLToMarkdown(C.GoString(html))
+	if err != nil {
+		return jsonReply(nil, err)
+	}
+	return jsonReply(map[string]string{"markdown": md}, nil)
+}
+
 var errNotOpen = &nativeError{"vault not open — call mindbase_open first"}
 
 type nativeError struct{ msg string }

@@ -32,7 +32,7 @@ rtk gh pr view <n>      rtk gh run list         rtk gh issue list
 rtk docker ps           rtk kubectl get         rtk docker logs <c>
 
 # Package managers (70-90% savings)
-rtk pip list            rtk pnpm install        rtk npm run <script>
+rtk pip list            rtk bun install         rtk npm run <script>
 ```
 
 ## Rules

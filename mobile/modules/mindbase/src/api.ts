@@ -1,6 +1,8 @@
 import Native from './MindbaseModule';
 import type {
   Note,
+  NoteHistory,
+  NoteRevision,
   SearchResult,
   VaultInfo,
   VaultSnapshot,
@@ -20,6 +22,8 @@ function parseJSON<T>(json: string): T {
   }
   return data;
 }
+
+export { wysiwygNativeReady } from './MindbaseModule';
 
 export function defaultVaultPath(): string {
   return Native.defaultVaultPath();
@@ -67,4 +71,32 @@ export async function ensureDailyNote(isoDate: string): Promise<string> {
 export async function ensureWeeklyNote(): Promise<string> {
   const payload = parseJSON<{ path: string }>(await Native.ensureWeeklyNote());
   return payload.path;
+}
+
+export async function noteHistory(path: string, limit = 30): Promise<NoteHistory> {
+  return parseJSON(await Native.noteHistory(path, limit));
+}
+
+export async function noteAtRev(path: string, rev: string): Promise<NoteRevision> {
+  return parseJSON(await Native.noteAtRev(path, rev));
+}
+
+export async function wysiwygPage(path: string, content: string): Promise<string> {
+  if (typeof Native.wysiwygPage !== 'function') {
+    throw new MindbaseError(
+      'wysiwygPage native method missing — rebuild dev client: make libmindbase && cd mobile && bun ios',
+    );
+  }
+  const payload = parseJSON<{ html: string }>(await Native.wysiwygPage(path, content));
+  return payload.html;
+}
+
+export async function htmlToMarkdown(html: string): Promise<string> {
+  if (typeof Native.htmlToMarkdown !== 'function') {
+    throw new MindbaseError(
+      'htmlToMarkdown native method missing — rebuild dev client: make libmindbase && cd mobile && bun ios',
+    );
+  }
+  const payload = parseJSON<{ markdown: string }>(await Native.htmlToMarkdown(html));
+  return payload.markdown;
 }

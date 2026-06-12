@@ -1,7 +1,10 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
-    "strict": true
+    "strict": true,
+    "paths": {
+      "mindbase": ["./modules/mindbase/index.ts"]
+    }
   },
   "include": ["**/*.ts", "**/*.tsx", "modules/**/*.ts"]
 }

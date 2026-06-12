@@ -34,6 +34,18 @@ class MindbaseNativeModule extends NativeModule {
   ensureWeeklyNote(): Promise<string> {
     return Promise.reject(new Error('Mindbase is not available on web'));
   }
+  noteHistory(_path: string, _limit: number): Promise<string> {
+    return Promise.reject(new Error('Mindbase is not available on web'));
+  }
+  noteAtRev(_path: string, _rev: string): Promise<string> {
+    return Promise.reject(new Error('Mindbase is not available on web'));
+  }
+  wysiwygPage(_path: string, _content: string): Promise<string> {
+    return Promise.reject(new Error('Mindbase is not available on web'));
+  }
+  htmlToMarkdown(_html: string): Promise<string> {
+    return Promise.reject(new Error('Mindbase is not available on web'));
+  }
 }
 
 export default registerWebModule(MindbaseNativeModule, 'Mindbase');

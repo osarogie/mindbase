@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, radii, spacing } from '../theme';
+import { colors, radii, spacing, typography } from '../theme';
 
 interface Props {
   title: string;
@@ -19,7 +19,7 @@ export function EmptyState({ title, body, actionLabel, onAction }: Props) {
       <Text style={styles.body}>{body}</Text>
       {actionLabel && onAction ? (
         <Pressable onPress={onAction} style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}>
-          <Ionicons name="add" size={16} color="#fff" />
+          <Ionicons name="add" size={16} color={colors.primaryFg} />
           <Text style={styles.buttonText}>{actionLabel}</Text>
         </Pressable>
       ) : null}
@@ -32,47 +32,48 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: spacing.xl,
+    padding: spacing.xxl,
     gap: spacing.sm,
   },
   iconWrap: {
-    width: 56,
-    height: 56,
-    borderRadius: radii.lg,
+    width: 64,
+    height: 64,
+    borderRadius: radii.xl,
     backgroundColor: colors.accentSoft,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.sm,
   },
   title: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: colors.text,
+    ...typography.title,
     textAlign: 'center',
   },
   body: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: colors.textSecondary,
+    ...typography.body,
+    color: colors.textMuted,
     textAlign: 'center',
-    maxWidth: 320,
+    maxWidth: 280,
   },
   button: {
-    marginTop: spacing.md,
+    marginTop: spacing.lg,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    backgroundColor: colors.text,
-    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.accent,
+    paddingHorizontal: spacing.xl,
     paddingVertical: spacing.md,
     borderRadius: radii.pill,
+    minHeight: 44,
   },
   buttonPressed: {
     opacity: 0.88,
+    transform: [{ scale: 0.98 }],
   },
   buttonText: {
-    color: '#fff',
+    ...typography.caption,
     fontWeight: '700',
-    fontSize: 15,
+    color: colors.primaryFg,
+    textTransform: 'none',
+    letterSpacing: 0,
   },
 });

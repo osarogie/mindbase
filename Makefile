@@ -1,4 +1,4 @@
-.PHONY: dev build run desktop mobile-sync templ tools clean pnpm-install libmindbase cli
+.PHONY: dev build run desktop mobile-sync templ tools clean bun-install libmindbase cli
 
 VAULT ?= ./vault
 ADDR ?= :8780
@@ -37,18 +37,21 @@ run: build
 dev:
 	go tool air
 
-pnpm-install:
-	pnpm install
+bun-install:
+	bun install
 
 desktop: libmindbase
 	chmod +x macos/scripts/*.sh
 	./macos/scripts/build-app.sh
 
-mobile-prebuild: libmindbase pnpm-install
-	pnpm mobile:prebuild
+mobile-prebuild: libmindbase bun-install
+	bun run mobile:prebuild
 
-legacy-web: pnpm-install
-	pnpm web:build
+mobile-prebuild-clean: libmindbase bun-install
+	bun run mobile:prebuild:clean
+
+legacy-web: bun-install
+	bun run web:build
 
 clean:
-	rm -rf bin/mind bin/mindbase tmp web/dist node_modules mobile/node_modules macos/build web/node_modules pnpm-lock.yaml
+	rm -rf bin/mind bin/mindbase tmp web/dist node_modules mobile/node_modules macos/build web/node_modules bun.lock

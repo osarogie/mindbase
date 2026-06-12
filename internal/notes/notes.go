@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/osarogie/mindbase/internal/snapshots"
 	"github.com/osarogie/mindbase/internal/vault"
 	"github.com/osarogie/mindbase/internal/vaultgit"
 )
@@ -110,7 +111,9 @@ func (s *Service) Save(relPath, content string) (*Note, error) {
 	if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
 		return nil, fmt.Errorf("write note: %w", err)
 	}
-	_ = vaultgit.Track(s.vault.Root, []string{vaultgit.NotePath(relPath)}, "Update note "+relPath)
+	msg := "Update note " + relPath
+	_ = vaultgit.Track(s.vault.Root, []string{vaultgit.NotePath(relPath)}, msg)
+	_ = snapshots.Record(s.vault.Root, vaultgit.NotePath(relPath), content, msg)
 	return s.Get(relPath)
 }
 

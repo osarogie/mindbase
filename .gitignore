@@ -17,3 +17,4 @@ web/package-lock.json
 mobile/package-lock.json
 .cursor/
 vault/.mindbase/secrets.json
+/.expo

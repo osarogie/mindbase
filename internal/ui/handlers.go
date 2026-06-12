@@ -14,6 +14,7 @@ import (
 	"github.com/osarogie/mindbase/internal/connectors"
 	"github.com/osarogie/mindbase/internal/attachments"
 	"github.com/osarogie/mindbase/internal/database"
+	"github.com/osarogie/mindbase/internal/editor"
 	"github.com/osarogie/mindbase/internal/excalidraw"
 	"github.com/osarogie/mindbase/internal/journal"
 	"github.com/osarogie/mindbase/internal/markdown"
@@ -64,6 +65,8 @@ func (h *Handlers) Mount(r chi.Router) {
 	r.Post("/attachments/*", h.handleUploadAttachment)
 	r.Get("/preview/*", h.handlePreview)
 	r.Post("/preview", h.handlePreviewBody)
+	r.Post("/editor/wysiwyg", h.handleWysiwygPage)
+	r.Post("/editor/html-to-markdown", h.handleHTMLToMarkdown)
 	r.Get("/excalidraw/{note}/*", h.handleExcalidraw)
 	r.Get("/sync/status", h.handleSyncStatus)
 	r.Get("/journal/today", h.handleJournalToday)
@@ -357,6 +360,41 @@ func (h *Handlers) writePreviewHTML(w http.ResponseWriter, content, notePath str
 	html := string(markdown.Render(content, h.renderOpts(notePath)))
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = w.Write([]byte(`<div class="markdown-preview-inner">` + html + `</div>`))
+}
+
+func (h *Handlers) handleWysiwygPage(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		Content string `json:"content"`
+		Path    string `json:"path"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	path := strings.Trim(payload.Path, "/")
+	if path == "" {
+		path = "preview.md"
+	}
+	page := editor.BuildPage(payload.Content, h.renderOpts(path))
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = w.Write([]byte(page.HTML))
+}
+
+func (h *Handlers) handleHTMLToMarkdown(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		HTML string `json:"html"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	md, err := editor.HTMLToMarkdown(payload.HTML)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]string{"markdown": md})
 }
 
 func (h *Handlers) handleExcalidraw(w http.ResponseWriter, r *http.Request) {

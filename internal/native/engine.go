@@ -7,11 +7,14 @@ import (
 	"time"
 
 	"github.com/osarogie/mindbase/internal/database"
+	"github.com/osarogie/mindbase/internal/editor"
 	"github.com/osarogie/mindbase/internal/journal"
 	"github.com/osarogie/mindbase/internal/markdown"
 	"github.com/osarogie/mindbase/internal/notes"
 	"github.com/osarogie/mindbase/internal/search"
+	"github.com/osarogie/mindbase/internal/snapshots"
 	"github.com/osarogie/mindbase/internal/vault"
+	"github.com/osarogie/mindbase/internal/vaultgit"
 	"github.com/osarogie/mindbase/internal/vaultparse"
 )
 
@@ -203,26 +206,38 @@ func (e *Engine) Search(query string) ([]search.Result, error) {
 	return e.search.Query(query)
 }
 
-func (e *Engine) PreviewHTML(notePath string) (string, error) {
-	n, err := e.notes.Get(notePath)
-	if err != nil {
-		return "", err
-	}
+func (e *Engine) renderOpts(notePath string) markdown.RenderOptions {
 	paths := make([]string, 0)
 	if list, err := e.notes.List(); err == nil {
 		for _, item := range list {
 			paths = append(paths, item.Path)
 		}
 	}
-	opts := markdown.RenderOptions{
+	return markdown.RenderOptions{
 		NotePath:  notePath,
 		NoteIndex: markdown.BuildNoteIndex(paths),
 		LoadDatabase: func(name string) (*database.Table, error) {
 			return e.databases.Get(name)
 		},
 	}
-	inner := string(markdown.Render(n.Content, opts))
+}
+
+func (e *Engine) PreviewHTML(notePath string) (string, error) {
+	n, err := e.notes.Get(notePath)
+	if err != nil {
+		return "", err
+	}
+	inner := string(markdown.Render(n.Content, e.renderOpts(notePath)))
 	return `<div class="markdown-preview-inner">` + inner + `</div>`, nil
+}
+
+func (e *Engine) RenderWysiwygPage(notePath, content string) (string, error) {
+	page := editor.BuildPage(content, e.renderOpts(notePath))
+	return page.HTML, nil
+}
+
+func (e *Engine) HTMLToMarkdown(html string) (string, error) {
+	return editor.HTMLToMarkdown(html)
 }
 
 func (e *Engine) EnsureDailyNote(date time.Time) (string, error) {
@@ -233,6 +248,73 @@ func (e *Engine) EnsureDailyNote(date time.Time) (string, error) {
 		}
 	}
 	return path, nil
+}
+
+type HistoryCommit struct {
+	Hash    string `json:"hash"`
+	Short   string `json:"short"`
+	Date    string `json:"date"`
+	Subject string `json:"subject"`
+	Source  string `json:"source,omitempty"`
+}
+
+type NoteHistory struct {
+	Path    string          `json:"path"`
+	HasGit  bool            `json:"has_git"`
+	HasRepo bool            `json:"has_repo"`
+	Source  string          `json:"source"`
+	Commits []HistoryCommit `json:"commits"`
+}
+
+func (e *Engine) NoteHistory(notePath string, limit int) (NoteHistory, error) {
+	if limit <= 0 {
+		limit = 30
+	}
+	gitPath := vaultgit.NotePath(notePath)
+	out := NoteHistory{
+		Path:   notePath,
+		HasGit: vaultgit.HasRepo(e.vault.Root),
+		Source: "snapshots",
+	}
+
+	if out.HasGit {
+		out.HasRepo = true
+		commits, err := vaultgit.Log(e.vault.Root, vaultgit.LogOptions{Limit: limit, Path: gitPath})
+		if err == nil && len(commits) > 0 {
+			out.Source = "git"
+			out.Commits = make([]HistoryCommit, 0, len(commits))
+			for _, c := range commits {
+				out.Commits = append(out.Commits, HistoryCommit{
+					Hash: c.Hash, Short: c.Short, Date: c.Date, Subject: c.Subject, Source: "git",
+				})
+			}
+			return out, nil
+		}
+	}
+
+	entries, err := snapshots.Log(e.vault.Root, gitPath, limit)
+	if err != nil {
+		return out, err
+	}
+	out.Commits = make([]HistoryCommit, 0, len(entries))
+	for _, c := range entries {
+		out.Commits = append(out.Commits, HistoryCommit{
+			Hash: c.Hash, Short: c.Short, Date: c.Date, Subject: c.Subject, Source: "snapshots",
+		})
+	}
+	return out, nil
+}
+
+func (e *Engine) NoteAtRev(notePath, rev string) (string, error) {
+	rev = strings.TrimSpace(rev)
+	if rev == "" {
+		return "", fmt.Errorf("rev required")
+	}
+	gitPath := vaultgit.NotePath(notePath)
+	if strings.HasPrefix(rev, "snap-") {
+		return snapshots.Content(e.vault.Root, gitPath, rev)
+	}
+	return vaultgit.FileAtRev(e.vault.Root, rev, gitPath)
 }
 
 func (e *Engine) EnsureWeeklyNote(date time.Time) (string, error) {

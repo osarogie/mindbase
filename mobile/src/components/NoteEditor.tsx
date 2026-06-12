@@ -1,21 +1,25 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { useMemo, useState } from 'react';
+import { memo, useImperativeHandle, useRef, useState, forwardRef } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
-import { colors, radii, spacing } from '../theme';
-import { extractTitle, insertMarkdown, setTitleInContent } from '../utils/noteContent';
+import {
+  KeyboardAvoidingView,
+  KeyboardStickyView,
+} from 'react-native-keyboard-controller';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNativeTabBarInset } from '../hooks/useNativeTabBarInset';
+import { colors, radii, spacing, typography } from '../theme';
+import { HistoryPanel } from './HistoryPanel';
 import { IconButton } from './IconButton';
-import { MarkdownPreview } from './MarkdownPreview';
+import { SafeTopSpacer } from './SafeTopSpacer';
+import { WysiwygEditor, type WysiwygEditorHandle } from './WysiwygEditor';
 import type { Note } from 'mindbase';
 
 interface Props {
@@ -24,76 +28,99 @@ interface Props {
   dirty: boolean;
   saving: boolean;
   onBack?: () => void;
+  includeTopInset?: boolean;
   onChange: (content: string) => void;
-  onSave: () => void;
+  onSave: (contentOverride?: string) => void | Promise<void>;
 }
 
+export interface NoteEditorHandle {
+  saveWithFlush: () => Promise<void>;
+}
+
+const TOOLBAR_DOCK_HEIGHT = 52;
+
 const TOOLBAR = [
-  { icon: 'text-outline' as const, label: 'H1', snippet: '# Heading' },
-  { icon: 'remove-outline' as const, label: 'H2', snippet: '## Heading' },
-  { icon: 'list-outline' as const, label: 'List', snippet: '- Item' },
-  { icon: 'checkbox-outline' as const, label: 'Task', snippet: '- [ ] Task' },
-  { icon: 'code-slash-outline' as const, label: 'Code', snippet: '```\ncode\n```' },
-  { icon: 'link-outline' as const, label: 'Link', snippet: '[label](url)' },
+  { icon: 'text-outline' as const, label: 'H1', action: { type: 'block' as const, block: 'h1' as const } },
+  { icon: 'remove-outline' as const, label: 'H2', action: { type: 'block' as const, block: 'h2' as const } },
+  { icon: 'list-outline' as const, label: 'List', action: { type: 'block' as const, block: 'list' as const } },
+  { icon: 'checkbox-outline' as const, label: 'Task', action: { type: 'block' as const, block: 'task' as const } },
+  { icon: 'chatbox-ellipses-outline' as const, label: 'Quote', action: { type: 'block' as const, block: 'quote' as const } },
+  { icon: 'code-slash-outline' as const, label: 'Code', action: { type: 'block' as const, block: 'code' as const } },
+  { glyph: 'B' as const, label: 'Bold', action: { type: 'inline' as const, format: 'bold' as const }, bold: true },
+  { glyph: 'I' as const, label: 'Italic', action: { type: 'inline' as const, format: 'italic' as const }, italic: true },
 ];
 
-export function NoteEditor({ note, content, dirty, saving, onBack, onChange, onSave }: Props) {
-  const [focusPreview, setFocusPreview] = useState(false);
-  const title = useMemo(() => extractTitle(content, note.title), [content, note.title]);
+export const NoteEditor = memo(
+  forwardRef<NoteEditorHandle, Props>(function NoteEditor(
+    {
+      note,
+      content,
+      dirty,
+      saving,
+      onBack,
+      includeTopInset = true,
+      onChange,
+      onSave,
+    },
+    ref,
+  ) {
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const editorRef = useRef<WysiwygEditorHandle>(null);
+  const insets = useSafeAreaInsets();
+  const tabBarInset = useNativeTabBarInset();
 
-  const updateTitle = (nextTitle: string) => {
-    onChange(setTitleInContent(content, nextTitle));
+  const handleSave = async () => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const flushed = await editorRef.current?.flushPendingChanges();
+    if (flushed !== undefined && flushed !== content) {
+      onChange(flushed);
+    }
+    await onSave(flushed);
   };
 
-  const appendSnippet = (snippet: string) => {
-    onChange(insertMarkdown(content, snippet));
+  useImperativeHandle(ref, () => ({
+    saveWithFlush: handleSave,
+  }));
+
+  const runToolbarAction = (action: (typeof TOOLBAR)[number]['action']) => {
+    if (action.type === 'block') {
+      editorRef.current?.insertBlock(action.block);
+    } else {
+      editorRef.current?.applyInlineFormat(action.format);
+    }
     void Haptics.selectionAsync();
   };
 
-  const handleSave = () => {
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onSave();
-  };
+  const toolbarBottomInset = Math.max(spacing.sm, insets.bottom);
 
   return (
-    <KeyboardAvoidingView
-      style={styles.root}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-    >
+    <View style={styles.root}>
+      {includeTopInset ? <SafeTopSpacer backgroundColor={colors.editorBg} /> : null}
+
       <View style={styles.topBar}>
         <View style={styles.topLeft}>
           {onBack ? <IconButton icon="chevron-back" onPress={onBack} /> : null}
-          <View style={styles.meta}>
-            <Text style={styles.path} numberOfLines={1}>
-              {note.path}
-            </Text>
-            <View style={styles.statusRow}>
-              <View style={[styles.statusDot, dirty ? styles.statusDotDirty : styles.statusDotSaved]} />
-              <Text style={styles.status}>
-                {saving ? 'Saving…' : dirty ? 'Editing' : 'Up to date'}
-              </Text>
-            </View>
-          </View>
+          <Text style={styles.path} numberOfLines={1}>
+            {note.path}
+          </Text>
         </View>
         <View style={styles.topActions}>
+          <View style={styles.statusRow}>
+            <View style={[styles.statusDot, dirty ? styles.statusDotDirty : styles.statusDotSaved]} />
+            <Text style={styles.status}>{saving ? 'Saving…' : dirty ? 'Editing' : 'Saved'}</Text>
+          </View>
           <Pressable
-            onPress={() => setFocusPreview((value) => !value)}
-            style={({ pressed }) => [styles.modeBtn, focusPreview && styles.modeBtnActive, pressed && styles.modeBtnPressed]}
+            onPress={() => setHistoryOpen(true)}
+            style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
+            accessibilityRole="button"
+            accessibilityLabel="Version history"
           >
-            <Ionicons
-              name={focusPreview ? 'eye-outline' : 'create-outline'}
-              size={15}
-              color={focusPreview ? colors.accent : colors.textSecondary}
-            />
-            <Text style={[styles.modeText, focusPreview && styles.modeTextActive]}>
-              {focusPreview ? 'Preview' : 'Write'}
-            </Text>
+            <Ionicons name="time-outline" size={18} color={colors.textSecondary} />
           </Pressable>
           <Pressable
             accessibilityRole="button"
             disabled={!dirty || saving}
-            onPress={handleSave}
+            onPress={() => void handleSave()}
             style={({ pressed }) => [
               styles.saveBtn,
               (!dirty || saving) && styles.saveBtnDisabled,
@@ -103,82 +130,84 @@ export function NoteEditor({ note, content, dirty, saving, onBack, onChange, onS
             {saving ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
-              <>
-                <Ionicons name="checkmark" size={16} color="#fff" />
-                <Text style={styles.saveText}>Save</Text>
-              </>
+              <Ionicons name="checkmark" size={18} color="#fff" />
             )}
           </Pressable>
         </View>
       </View>
 
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="interactive"
-        showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView
+        style={styles.editorStack}
+        behavior="padding"
+        keyboardVerticalOffset={tabBarInset}
       >
-        <View style={styles.pageCard}>
-          <TextInput
-            value={title}
-            onChangeText={updateTitle}
-            placeholder="Untitled"
-            placeholderTextColor={colors.textMuted}
-            style={styles.titleInput}
-          />
-
-          {!focusPreview ? (
-            <>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.toolbar}>
-                {TOOLBAR.map((item) => (
-                  <Pressable
-                    key={item.label}
-                    onPress={() => appendSnippet(item.snippet)}
-                    style={({ pressed }) => [styles.toolChip, pressed && styles.toolChipPressed]}
-                  >
-                    <Ionicons name={item.icon} size={14} color={colors.textSecondary} />
-                    <Text style={styles.toolLabel}>{item.label}</Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-
-              <TextInput
-                value={content}
-                onChangeText={onChange}
-                multiline
-                textAlignVertical="top"
-                placeholder="Write in markdown. Headings, lists, and links render below as you type."
-                placeholderTextColor={colors.textMuted}
-                style={styles.editorInput}
-                autoCorrect
-                spellCheck
-              />
-            </>
-          ) : null}
-
-          <View style={styles.previewDivider} />
-          <MarkdownPreview content={content} embedded />
+        <View style={[styles.editorPane, { paddingBottom: TOOLBAR_DOCK_HEIGHT }]}>
+          <WysiwygEditor ref={editorRef} path={note.path} content={content} onChange={onChange} />
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+
+      <KeyboardStickyView offset={{ closed: 0, opened: tabBarInset }}>
+        <View style={[styles.toolbarDock, { paddingBottom: toolbarBottomInset }]}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.toolbarContent}
+          >
+            {TOOLBAR.map((item) => (
+              <Pressable
+                key={item.label}
+                onPress={() => runToolbarAction(item.action)}
+                style={({ pressed }) => [styles.toolChip, pressed && styles.toolChipPressed]}
+              >
+                {'icon' in item ? (
+                  <Ionicons name={item.icon} size={14} color={colors.textSecondary} />
+                ) : (
+                  <Text
+                    style={[
+                      styles.toolGlyph,
+                      item.bold && styles.toolGlyphBold,
+                      item.italic && styles.toolGlyphItalic,
+                    ]}
+                  >
+                    {item.glyph}
+                  </Text>
+                )}
+                <Text style={styles.toolLabel}>{item.label}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </View>
+      </KeyboardStickyView>
+
+      <HistoryPanel
+        path={note.path}
+        visible={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        onRestore={(restored) => {
+          onChange(restored);
+          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }}
+      />
+    </View>
   );
-}
+}),
+);
 
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: colors.bg,
+    backgroundColor: colors.editorBg,
   },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.sm,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.editorBg,
   },
   topLeft: {
     flexDirection: 'row',
@@ -187,23 +216,20 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
-  meta: {
-    flex: 1,
-    minWidth: 0,
-  },
   path: {
+    ...typography.caption,
     fontSize: 12,
     color: colors.textMuted,
+    flex: 1,
   },
   statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    marginTop: 4,
   },
   statusDot: {
-    width: 7,
-    height: 7,
+    width: 6,
+    height: 6,
     borderRadius: radii.pill,
   },
   statusDotDirty: {
@@ -213,49 +239,31 @@ const styles = StyleSheet.create({
     backgroundColor: colors.success,
   },
   status: {
-    fontSize: 13,
-    color: colors.textSecondary,
+    ...typography.caption,
+    fontSize: 11,
+    color: colors.textMuted,
   },
   topActions: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
   },
-  modeBtn: {
-    flexDirection: 'row',
+  iconBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: radii.sm,
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.pill,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    justifyContent: 'center',
   },
-  modeBtnActive: {
-    backgroundColor: colors.accentSoft,
-    borderColor: colors.accentSoft,
-  },
-  modeBtnPressed: {
+  iconBtnPressed: {
     opacity: 0.85,
   },
-  modeText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
-  modeTextActive: {
-    color: colors.accent,
-  },
   saveBtn: {
-    flexDirection: 'row',
+    width: 34,
+    height: 34,
+    borderRadius: radii.sm,
+    backgroundColor: colors.accent,
     alignItems: 'center',
-    gap: spacing.xs,
-    backgroundColor: colors.text,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.pill,
-    minWidth: 84,
     justifyContent: 'center',
   },
   saveBtnDisabled: {
@@ -264,41 +272,24 @@ const styles = StyleSheet.create({
   saveBtnPressed: {
     opacity: 0.85,
   },
-  saveText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  scroll: {
+  editorStack: {
     flex: 1,
+    minHeight: 0,
   },
-  scrollContent: {
-    padding: spacing.lg,
-    paddingBottom: spacing.xl * 2,
+  editorPane: {
+    flex: 1,
+    minHeight: 0,
   },
-  pageCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-    padding: spacing.lg,
-    gap: spacing.md,
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
-  },
-  titleInput: {
-    fontSize: 30,
-    lineHeight: 36,
-    fontWeight: '700',
-    color: colors.text,
-    padding: 0,
-  },
-  toolbar: {
+  toolbarDock: {
     flexGrow: 0,
-    marginHorizontal: -spacing.xs,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+    backgroundColor: colors.editorBg,
+  },
+  toolbarContent: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    gap: spacing.sm,
   },
   toolChip: {
     flexDirection: 'row',
@@ -308,27 +299,29 @@ const styles = StyleSheet.create({
     borderRadius: radii.pill,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    marginHorizontal: spacing.xs,
+    marginRight: spacing.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
   },
   toolChipPressed: {
     backgroundColor: colors.border,
   },
   toolLabel: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
     color: colors.textSecondary,
   },
-  editorInput: {
-    minHeight: 180,
-    fontSize: 16,
-    lineHeight: 26,
-    color: colors.text,
-    fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }),
-    padding: 0,
+  toolGlyph: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    minWidth: 14,
+    textAlign: 'center',
   },
-  previewDivider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.border,
-    marginVertical: spacing.xs,
+  toolGlyphBold: {
+    fontWeight: '800',
+  },
+  toolGlyphItalic: {
+    fontStyle: 'italic',
+    fontWeight: '600',
   },
 });

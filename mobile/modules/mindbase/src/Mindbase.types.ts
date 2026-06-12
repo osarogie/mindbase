@@ -65,6 +65,28 @@ export interface Note {
   modified: string;
 }
 
+export interface HistoryCommit {
+  hash: string;
+  short: string;
+  date: string;
+  subject: string;
+  source?: string;
+}
+
+export interface NoteHistory {
+  path: string;
+  has_git: boolean;
+  has_repo: boolean;
+  source: string;
+  commits: HistoryCommit[];
+}
+
+export interface NoteRevision {
+  path: string;
+  rev: string;
+  content: string;
+}
+
 export interface SearchResult {
   path: string;
   title: string;

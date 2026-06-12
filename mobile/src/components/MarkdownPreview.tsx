@@ -1,5 +1,5 @@
 import { marked } from 'marked';
-import { useMemo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import { colors, radii, spacing } from '../theme';
@@ -13,8 +13,8 @@ marked.setOptions({ gfm: true, breaks: true });
 
 function previewDocument(body: string, embedded: boolean) {
   const pad = embedded
-    ? `padding: ${spacing.sm}px ${spacing.lg}px ${spacing.md}px;`
-    : `padding: ${spacing.md}px ${spacing.lg}px;`;
+    ? `padding: ${spacing.xs}px 0 ${spacing.sm}px;`
+    : `padding: ${spacing.lg}px ${spacing.xl}px;`;
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -57,7 +57,7 @@ function previewDocument(body: string, embedded: boolean) {
       padding-left: 12px;
       color: ${colors.textSecondary};
     }
-    a { color: ${colors.accent}; text-decoration: none; }
+    a { color: ${colors.teal}; text-decoration: none; font-weight: 500; }
     hr { border: none; border-top: 1px solid ${colors.border}; margin: 16px 0; }
   </style>
 </head>
@@ -84,7 +84,7 @@ const heightScript = `
   true;
 `;
 
-export function MarkdownPreview({ content, embedded = false }: Props) {
+export const MarkdownPreview = memo(function MarkdownPreview({ content, embedded = false }: Props) {
   const [height, setHeight] = useState(120);
 
   const html = useMemo(() => {
@@ -114,7 +114,7 @@ export function MarkdownPreview({ content, embedded = false }: Props) {
       />
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   wrap: {

@@ -29,3 +29,19 @@ export function formatModified(iso: string): string {
   if (Number.isNaN(date.getTime())) return '';
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
+
+export function formatHistoryDate(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+/** Wrap selection or append inline markdown markers. */
+export function wrapMarkdown(content: string, before: string, after: string, placeholder: string): string {
+  return content ? `${content}\n${before}${placeholder}${after}` : `${before}${placeholder}${after}`;
+}

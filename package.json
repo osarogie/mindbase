@@ -1,13 +1,18 @@
 {
   "name": "mindbase",
   "private": true,
-  "packageManager": "pnpm@10.12.1",
+  "packageManager": "bun@1.3.14",
+  "workspaces": [
+    "mobile",
+    "web"
+  ],
   "scripts": {
-    "mobile:prebuild": "pnpm --filter mindbase-mobile prebuild",
-    "mobile:start": "pnpm --filter mindbase-mobile start",
-    "mobile:ios": "pnpm --filter mindbase-mobile ios",
-    "mobile:android": "pnpm --filter mindbase-mobile android",
-    "web:build": "pnpm --filter mindbase-web build",
-    "web:dev": "pnpm --filter mindbase-web dev"
+    "mobile:prebuild": "bun run --cwd mobile prebuild",
+    "mobile:prebuild:clean": "bun run --cwd mobile prebuild:clean",
+    "mobile:start": "bun run --cwd mobile start",
+    "mobile:ios": "bun run --cwd mobile ios",
+    "mobile:android": "bun run --cwd mobile android",
+    "web:build": "bun run --cwd web build",
+    "web:dev": "bun run --cwd web dev"
   }
 }

@@ -98,6 +98,10 @@ extern char* mindbase_search(char* query);
 extern char* mindbase_preview_html(char* path);
 extern char* mindbase_ensure_daily_note(char* isoDate);
 extern char* mindbase_ensure_weekly_note(void);
+extern char* mindbase_note_history(char* path, int limit);
+extern char* mindbase_note_at_rev(char* path, char* rev);
+extern char* mindbase_wysiwyg_page(char* path, char* content);
+extern char* mindbase_html_to_markdown(char* html);
 
 #ifdef __cplusplus
 }

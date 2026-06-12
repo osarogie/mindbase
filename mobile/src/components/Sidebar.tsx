@@ -1,6 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import {
+  ActivityIndicator,
   FlatList,
+  Platform,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -8,10 +10,13 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { colors, radii, spacing } from '../theme';
+import { useTopSpacerHeight, useEffectiveBottomInset } from '../hooks/useSafeTopPadding';
+import { colors, radii, softShadow, spacing, typography } from '../theme';
 import { formatModified } from '../utils/noteContent';
-import { IconButton } from './IconButton';
+import { ActionChips } from './ActionChips';
+import { ErrorBanner } from './ErrorBanner';
 import type { VaultItem } from 'mindbase';
+import { memo, useCallback } from 'react';
 
 interface Props {
   vaultName: string;
@@ -19,7 +24,11 @@ interface Props {
   selectedPath: string | null;
   query: string;
   refreshing: boolean;
-  showFab?: boolean;
+  error?: string | null;
+  onDismissError?: () => void;
+  loading?: boolean;
+  showSearch?: boolean;
+  searchAutoFocus?: boolean;
   onQueryChange: (value: string) => void;
   onSelect: (item: VaultItem) => void;
   onNewPage: () => void;
@@ -27,115 +36,151 @@ interface Props {
   onRefresh: () => void;
 }
 
+const VaultRow = memo(function VaultRow({
+  item,
+  active,
+  onSelect,
+}: {
+  item: VaultItem;
+  active: boolean;
+  onSelect: (item: VaultItem) => void;
+}) {
+  return (
+    <Pressable
+      onPress={() => onSelect(item)}
+      style={({ pressed }) => [styles.row, active && styles.rowActive, pressed && styles.rowPressed]}
+    >
+      {active ? <View style={styles.rowAccent} /> : null}
+      <View style={[styles.iconBadge, active && styles.iconBadgeActive]}>
+        <Ionicons
+          name={item.kind === 'database' ? 'grid-outline' : 'document-text-outline'}
+          size={16}
+          color={active ? colors.accent : colors.textSecondary}
+        />
+      </View>
+      <View style={styles.rowBody}>
+        <Text style={[styles.rowTitle, active && styles.rowTitleActive]} numberOfLines={1}>
+          {item.title}
+        </Text>
+        <Text style={styles.rowSub} numberOfLines={1}>
+          {item.folder || item.subtitle || formatModified(item.modified)}
+        </Text>
+      </View>
+      <Ionicons name="chevron-forward" size={14} color={colors.textMuted} />
+    </Pressable>
+  );
+});
+
 export function Sidebar({
   vaultName,
   items,
   selectedPath,
   query,
   refreshing,
-  showFab,
+  error,
+  onDismissError,
+  loading = false,
+  showSearch = true,
+  searchAutoFocus = false,
   onQueryChange,
   onSelect,
   onNewPage,
   onToday,
   onRefresh,
 }: Props) {
-  return (
-    <View style={styles.root}>
-      <View style={styles.header}>
+  const topInset = useTopSpacerHeight();
+  const bottomInset = useEffectiveBottomInset();
+
+  const renderItem = useCallback(
+    ({ item }: { item: VaultItem }) => (
+      <VaultRow item={item} active={item.path === selectedPath} onSelect={onSelect} />
+    ),
+    [onSelect, selectedPath],
+  );
+
+  const listHeader = (
+    <View>
+      <View style={[styles.topInsetSpacer, { height: topInset }]} />
+      {error ? <ErrorBanner message={error} onDismiss={onDismissError ?? (() => {})} /> : null}
+
+      <View style={styles.headerCard}>
         <View style={styles.brandRow}>
           <View style={styles.logo}>
-            <Ionicons name="library-outline" size={18} color={colors.accent} />
+            <Ionicons name="library-outline" size={20} color={colors.accent} />
           </View>
           <View style={styles.brandText}>
-            <Text style={styles.vaultName}>{vaultName || 'Mindbase'}</Text>
+            <Text style={styles.vaultLabel}>Vault</Text>
+            <Text style={styles.vaultName} numberOfLines={1}>
+              {vaultName || 'Mindbase'}
+            </Text>
             <Text style={styles.meta}>{items.length} pages</Text>
           </View>
         </View>
 
-        <View style={styles.actions}>
-          <IconButton icon="add" label="New page" onPress={onNewPage} active />
-          <IconButton icon="today-outline" label="Today" onPress={onToday} />
-          <IconButton icon="refresh-outline" onPress={onRefresh} />
-        </View>
+        <ActionChips onNewPage={onNewPage} onToday={onToday} onRefresh={onRefresh} />
 
-        <View style={styles.searchWrap}>
-          <Ionicons name="search" size={16} color={colors.textMuted} />
-          <TextInput
-            value={query}
-            onChangeText={onQueryChange}
-            placeholder="Search pages"
-            placeholderTextColor={colors.textMuted}
-            style={styles.search}
-            autoCapitalize="none"
-            autoCorrect={false}
-            clearButtonMode="while-editing"
-          />
-        </View>
+        {showSearch ? (
+          <View style={styles.searchWrap}>
+            <Ionicons name="search" size={17} color={colors.textMuted} />
+            <TextInput
+              value={query}
+              onChangeText={onQueryChange}
+              placeholder="Search pages"
+              placeholderTextColor={colors.textMuted}
+              style={styles.search}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoFocus={searchAutoFocus}
+              clearButtonMode="while-editing"
+            />
+          </View>
+        ) : null}
       </View>
 
+      <View style={styles.listSectionHeader}>
+        <Text style={styles.listSectionTitle}>Pages</Text>
+      </View>
+    </View>
+  );
+
+  return (
+    <View style={styles.root} collapsable={false}>
       <FlatList
+        style={styles.list}
         data={items}
         keyExtractor={(item) => item.id}
+        renderItem={renderItem}
+        initialNumToRender={14}
+        maxToRenderPerBatch={12}
+        windowSize={8}
+        removeClippedSubviews={Platform.OS === 'android'}
+        contentInsetAdjustmentBehavior="never"
+        automaticallyAdjustsScrollIndicatorInsets
+        automaticallyAdjustKeyboardInsets
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={[
           styles.listContent,
           items.length === 0 && styles.listContentEmpty,
-          { paddingBottom: spacing.xl * 2 + (showFab ? 72 : 0) },
+          { paddingBottom: spacing.xxl * 2 + bottomInset },
         ]}
-        keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />
         }
+        ListHeaderComponent={listHeader}
         ListEmptyComponent={
           <View style={styles.emptyWrap}>
+            <View style={styles.emptyIcon}>
+              <Ionicons name="document-text-outline" size={24} color={colors.accent} />
+            </View>
             <Text style={styles.emptyTitle}>No pages yet</Text>
             <Text style={styles.empty}>Create your first page or open Today&apos;s journal.</Text>
           </View>
         }
-        renderItem={({ item }) => {
-          const active = item.path === selectedPath;
-          return (
-            <Pressable
-              onPress={() => onSelect(item)}
-              style={({ pressed }) => [
-                styles.row,
-                active && styles.rowActive,
-                pressed && styles.rowPressed,
-              ]}
-            >
-              <View style={[styles.iconBadge, active && styles.iconBadgeActive]}>
-                <Ionicons
-                  name={item.kind === 'database' ? 'grid-outline' : 'document-text-outline'}
-                  size={15}
-                  color={active ? colors.accent : colors.textSecondary}
-                />
-              </View>
-              <View style={styles.rowBody}>
-                <Text style={[styles.rowTitle, active && styles.rowTitleActive]} numberOfLines={1}>
-                  {item.title}
-                </Text>
-                <Text style={styles.rowSub} numberOfLines={1}>
-                  {item.folder || item.subtitle || formatModified(item.modified)}
-                </Text>
-              </View>
-            </Pressable>
-          );
-        }}
       />
-
-      {showFab ? (
-        <Pressable
-          onPress={onNewPage}
-          style={({ pressed }) => [
-            styles.fab,
-            { bottom: spacing.lg },
-            pressed && styles.fabPressed,
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel="New page"
-        >
-          <Ionicons name="add" size={24} color="#fff" />
-        </Pressable>
+      {loading ? (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color={colors.accent} />
+        </View>
       ) : null}
     </View>
   );
@@ -144,15 +189,27 @@ export function Sidebar({
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: colors.surfaceMuted,
-    borderRightWidth: StyleSheet.hairlineWidth,
-    borderRightColor: colors.border,
+    backgroundColor: colors.bg,
   },
-  header: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.md,
-    gap: spacing.md,
+  list: {
+    flex: 1,
+    backgroundColor: colors.bg,
+  },
+  topInsetSpacer: {
+    width: '100%',
+    backgroundColor: colors.bg,
+  },
+  headerCard: {
+    marginHorizontal: spacing.screen,
+    marginTop: spacing.md,
+    marginBottom: spacing.lg,
+    padding: spacing.xl,
+    gap: spacing.lg,
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radii.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    ...softShadow(),
   },
   brandRow: {
     flexDirection: 'row',
@@ -160,8 +217,8 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   logo: {
-    width: 36,
-    height: 36,
+    width: 44,
+    height: 44,
     borderRadius: radii.md,
     backgroundColor: colors.accentSoft,
     alignItems: 'center',
@@ -169,41 +226,51 @@ const styles = StyleSheet.create({
   },
   brandText: {
     flex: 1,
+    gap: 2,
+  },
+  vaultLabel: {
+    ...typography.micro,
+    color: colors.textMuted,
   },
   vaultName: {
-    fontSize: 18,
-    fontWeight: '700',
+    ...typography.title,
+    fontSize: 20,
     color: colors.text,
   },
   meta: {
-    fontSize: 13,
+    ...typography.caption,
     color: colors.textMuted,
     marginTop: 2,
-  },
-  actions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.xs,
   },
   searchWrap: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceMuted,
     borderRadius: radii.md,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingVertical: Platform.OS === 'ios' ? spacing.md : spacing.sm,
+    minHeight: 44,
   },
   search: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 16,
     color: colors.text,
     paddingVertical: 0,
   },
+  listSectionHeader: {
+    paddingHorizontal: spacing.screen,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.md,
+  },
+  listSectionTitle: {
+    ...typography.micro,
+    color: colors.textMuted,
+  },
   listContent: {
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: spacing.screen,
   },
   listContentEmpty: {
     flexGrow: 1,
@@ -212,77 +279,89 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    borderRadius: radii.md,
-    marginBottom: spacing.xs,
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    borderRadius: radii.lg,
+    marginBottom: spacing.sm,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'transparent',
+    overflow: 'hidden',
   },
   rowActive: {
+    borderColor: colors.accentSoft,
     backgroundColor: colors.surface,
   },
   rowPressed: {
-    backgroundColor: colors.border,
+    backgroundColor: colors.surfaceMuted,
+  },
+  rowAccent: {
+    position: 'absolute',
+    left: 0,
+    top: spacing.sm,
+    bottom: spacing.sm,
+    width: 3,
+    borderRadius: radii.pill,
+    backgroundColor: colors.accent,
   },
   iconBadge: {
-    width: 28,
-    height: 28,
+    width: 32,
+    height: 32,
     borderRadius: radii.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceMuted,
   },
   iconBadgeActive: {
     backgroundColor: colors.accentSoft,
   },
   rowBody: {
     flex: 1,
+    gap: 2,
   },
   rowTitle: {
+    ...typography.headline,
     fontSize: 15,
-    fontWeight: '600',
     color: colors.text,
   },
   rowTitleActive: {
     color: colors.accent,
   },
   rowSub: {
+    ...typography.caption,
     fontSize: 12,
     color: colors.textMuted,
-    marginTop: 2,
   },
   emptyWrap: {
-    padding: spacing.xl,
+    padding: spacing.xxl,
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: spacing.sm,
+  },
+  emptyIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: radii.lg,
+    backgroundColor: colors.accentSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.sm,
   },
   emptyTitle: {
-    fontSize: 17,
-    fontWeight: '700',
+    ...typography.headline,
     color: colors.text,
   },
   empty: {
+    ...typography.body,
+    fontSize: 14,
     color: colors.textMuted,
     textAlign: 'center',
-    lineHeight: 20,
+    maxWidth: 260,
   },
-  fab: {
-    position: 'absolute',
-    right: spacing.lg,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.text,
+  loadingOverlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(246, 242, 232, 0.72)',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.18,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
-  },
-  fabPressed: {
-    opacity: 0.9,
-    transform: [{ scale: 0.98 }],
   },
 });

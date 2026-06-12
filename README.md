@@ -45,7 +45,7 @@ make dev      # :8090 — air hot reload (go, templ, js, css)
 make run      # :8780 — embedded static assets
 ```
 
-Legacy React UI (optional): `pnpm web:dev` then `make run -web web/dist`.
+Legacy React UI (optional): `bun web:dev` then `make run -web web/dist`.
 
 ## Version history
 
@@ -80,15 +80,29 @@ SwiftUI ──C API──► libmindbase.dylib (notes, DBs, search, preview, git
         ──auth──► hosted mindbase API (OAuth, connector sync)
 ```
 
-## Mobile (Expo + libmindbase)
+## Mobile (Expo dev client + libmindbase)
 
-The Expo module `mobile/modules/mindbase` wraps the same C API for iOS and Android. Requires a **development build** — Expo Go cannot load custom native code.
+Pure **Expo CNG** workflow — `expo prebuild` generates `ios/` and `android/`, and **expo-dev-client** loads your JS from Metro. This is not a brownfield embed; the app is React Native from the root with a local Expo module for native code.
+
+The local module `mobile/modules/mindbase` wraps the same C API for iOS and Android. **Expo Go cannot load custom native code** — you need a development build.
 
 ```bash
-make libmindbase
-make mobile-prebuild
-pnpm mobile:ios        # or pnpm mobile:android
-pnpm mobile:start      # Metro for dev client
+make libmindbase          # build libmindbase + iOS XCFramework / Android .so
+make mobile-prebuild      # libmindbase + expo prebuild (generates ios/ android/)
+bun mobile:ios           # compile & install dev client on simulator/device
+bun mobile:start         # Metro — connect from the dev client launcher
+```
+
+**Rebuild the dev client** after native changes (module, plugins, prebuild config):
+
+```bash
+cd mobile && bun prebuild:clean && bun ios
+```
+
+Optional **EAS dev client** (TestFlight / APK distribution):
+
+```bash
+cd mobile && eas build --profile development --platform ios
 ```
 
 Vault on device: app documents directory (`…/mindbase-vault`). No local HTTP server.
@@ -196,15 +210,15 @@ mind note get welcome.md
 
 Install globally: `make install-cli`. Use `--json` on any command for structured output.
 
-## Package manager (pnpm)
+## Package manager (Bun)
 
-pnpm workspaces cover mobile and the legacy React web UI:
+Bun workspaces cover mobile and the legacy React web UI:
 
 ```bash
-pnpm install
-pnpm web:dev
-pnpm mobile:prebuild
-pnpm mobile:start
+bun install
+bun web:dev
+bun mobile:prebuild
+bun mobile:start
 ```
 
 ## License

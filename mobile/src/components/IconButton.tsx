@@ -21,6 +21,7 @@ export function IconButton({ icon, label, onPress, active, disabled, style }: Pr
       accessibilityLabel={label ?? icon}
       disabled={disabled}
       onPress={onPress}
+      hitSlop={4}
       style={({ pressed }) => [
         styles.base,
         active && styles.active,
@@ -29,11 +30,13 @@ export function IconButton({ icon, label, onPress, active, disabled, style }: Pr
         style,
       ]}
     >
-      <Ionicons
-        name={icon}
-        size={18}
-        color={active ? colors.accent : disabled ? colors.textMuted : colors.textSecondary}
-      />
+      <View style={styles.iconWrap}>
+        <Ionicons
+          name={icon}
+          size={20}
+          color={active ? colors.accent : disabled ? colors.textMuted : colors.textSecondary}
+        />
+      </View>
       {label ? <Text style={[styles.label, active && styles.labelActive]}>{label}</Text> : null}
     </Pressable>
   );
@@ -44,9 +47,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm,
+    borderRadius: radii.md,
+    minHeight: 44,
+    minWidth: 44,
+    justifyContent: 'center',
+  },
+  iconWrap: {
+    width: 36,
+    height: 36,
     borderRadius: radii.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   active: {
     backgroundColor: colors.accentSoft,

@@ -12,8 +12,16 @@ declare class MindbaseNativeModule extends NativeModule {
   previewHtml(path: string): Promise<string>;
   ensureDailyNote(isoDate: string): Promise<string>;
   ensureWeeklyNote(): Promise<string>;
+  noteHistory(path: string, limit: number): Promise<string>;
+  noteAtRev(path: string, rev: string): Promise<string>;
+  wysiwygPage(path: string, content: string): Promise<string>;
+  htmlToMarkdown(html: string): Promise<string>;
 }
 
 const Native = requireNativeModule<MindbaseNativeModule>('Mindbase');
+
+export function wysiwygNativeReady(): boolean {
+  return typeof Native.wysiwygPage === 'function' && typeof Native.htmlToMarkdown === 'function';
+}
 
 export default Native;

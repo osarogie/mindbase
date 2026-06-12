@@ -7,6 +7,8 @@ export type BridgeMessage =
   | { type: 'blur' }
   | { type: 'stats'; words: number; chars: number }
   | { type: 'selectionToolbar'; visible: boolean }
+  | { type: 'attachment-uploaded'; path: string }
+  | { type: 'attachment-error'; message: string }
 
 export function postBridge(msg: BridgeMessage) {
   const payload = JSON.stringify(msg)
@@ -39,6 +41,7 @@ declare global {
     mindbaseGetMarkdown?: () => string
     mindbaseSetMarkdown?: (markdown: string) => void
     mindbaseRunSlashCommand?: (id: string) => void
+    mindbaseInsertAttachment?: (path: string) => void
   }
 }
 

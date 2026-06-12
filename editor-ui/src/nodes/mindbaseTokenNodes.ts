@@ -7,8 +7,6 @@ import {
   type Spread,
 } from 'lexical'
 
-type TokenFields = { token: string }
-
 export type SerializedWikiLinkNode = Spread<{ target: string; label: string }, SerializedTextNode>
 export type SerializedTagNode = Spread<{ tag: string }, SerializedTextNode>
 export type SerializedMentionNode = Spread<{ name: string }, SerializedTextNode>
@@ -121,7 +119,7 @@ export class TagNode extends MindbaseTokenNode {
     return this.__tag
   }
 
-  createDOM(config: EditorConfig): HTMLElement {
+  createDOM(_config: EditorConfig): HTMLElement {
     const el = document.createElement('span')
     el.className = 'mb-tag-link'
     el.textContent = `#${this.__tag}`

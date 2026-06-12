@@ -2,12 +2,14 @@ import { FileText, Database, Paperclip, Plus, Menu, X } from 'lucide-react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { NoteEntry, DatabaseEntry } from '../api'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 
 interface Props {
   notes: NoteEntry[]
   databases: DatabaseEntry[]
   open: boolean
+  vaultName?: string
   onToggle: () => void
   onNewNote: () => void
   onNewDatabase: () => void
@@ -17,6 +19,7 @@ export function Sidebar({
   notes,
   databases,
   open,
+  vaultName,
   onToggle,
   onNewNote,
   onNewDatabase,
@@ -42,6 +45,7 @@ export function Sidebar({
       <aside className={cn('sidebar', open && 'open')}>
         <div className="sidebar-header">
           <h1>mindbase</h1>
+          {vaultName && <Badge variant="secondary">{vaultName}</Badge>}
           <button type="button" className="icon-btn mobile-only" onClick={onToggle} aria-label="Close">
             <X size={20} />
           </button>

@@ -2,7 +2,6 @@ import { Outlet, useNavigate } from 'react-router-dom'
 import { useCallback, useEffect, useState } from 'react'
 import { api, DatabaseEntry, NoteEntry } from '@/api'
 import { Sidebar } from '@/components/Sidebar'
-import { Badge } from '@/components/ui/badge'
 
 export function AppShell() {
   const navigate = useNavigate()
@@ -49,14 +48,12 @@ export function AppShell() {
         notes={notes}
         databases={databases}
         open={sidebarOpen}
+        vaultName={vaultName}
         onToggle={() => setSidebarOpen((o) => !o)}
         onNewNote={newNote}
         onNewDatabase={newDatabase}
       />
       <main className="relative flex min-w-0 flex-1 flex-col">
-        <div className="absolute right-4 top-3 z-10">
-          <Badge variant="secondary">{vaultName}</Badge>
-        </div>
         <Outlet context={{ refresh }} />
       </main>
     </div>

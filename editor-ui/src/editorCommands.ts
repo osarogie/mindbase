@@ -28,7 +28,7 @@ export function writeMarkdown(editor: LexicalEditor, markdown: string) {
   })
 }
 
-function ensureRangeSelection(editor: LexicalEditor) {
+function ensureRangeSelection(_editor: LexicalEditor) {
   const selection = $getSelection()
   if ($isRangeSelection(selection)) return selection
   const root = $getRoot()

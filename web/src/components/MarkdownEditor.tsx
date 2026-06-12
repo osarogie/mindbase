@@ -12,7 +12,6 @@ export function MarkdownEditor({ value, onChange }: Props) {
     <CodeMirror
       value={value}
       height="100%"
-      theme="dark"
       extensions={[markdown({ base: markdownLanguage, codeLanguages: languages })]}
       onChange={onChange}
       className="markdown-editor"

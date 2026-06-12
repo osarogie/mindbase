@@ -34,7 +34,7 @@ export class ImageNode extends DecoratorNode<JSX.Element> {
   }
 
   static importJSON(json: SerializedImageNode): ImageNode {
-    return new ImageNode(json.src, json.alt)
+    return new ImageNode(json.src ?? '', json.alt ?? '')
   }
 
   constructor(src: string, alt: string, key?: NodeKey) {

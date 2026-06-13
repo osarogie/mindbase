@@ -10,6 +10,11 @@ function formatWhen(iso?: string): string {
   const t = new Date(iso).getTime()
   if (!Number.isFinite(t) || t <= 0) return 'never'
   const secs = Math.round((Date.now() - t) / 1000)
+  if (secs < 0) {
+    // Future timestamp (clock skew): minor skew reads as "just now", otherwise
+    // show the absolute date rather than a misleading "just now".
+    return secs > -300 ? 'just now' : new Date(iso).toLocaleDateString()
+  }
   if (secs < 60) return 'just now'
   if (secs < 3600) return `${Math.floor(secs / 60)}m ago`
   if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`
@@ -17,14 +22,24 @@ function formatWhen(iso?: string): string {
 }
 
 function summarize(r: SyncResult): string {
+  // Report both connectors independently — an error on one shouldn't hide the
+  // other's result (e.g. Notion failed but Drive still pushed files).
   const parts: string[] = []
   if (r.notion) {
-    if (r.notion.error) return `Notion error: ${r.notion.error}`
-    parts.push(`Notion: +${r.notion.imported} new, ${r.notion.updated} updated`)
+    parts.push(
+      r.notion.error
+        ? `Notion error: ${r.notion.error}`
+        : `Notion: +${r.notion.imported} new, ${r.notion.updated} updated`,
+    )
   }
   if (r.gdrive) {
-    if (r.gdrive.error) return `Drive error: ${r.gdrive.error}`
-    parts.push(`Drive: ${r.gdrive.uploaded + r.gdrive.updated} pushed`)
+    if (r.gdrive.error) {
+      parts.push(`Drive error: ${r.gdrive.error}`)
+    } else {
+      const bits = [`${r.gdrive.uploaded + r.gdrive.updated} pushed`]
+      if (r.gdrive.downloaded) bits.push(`${r.gdrive.downloaded} pulled`)
+      parts.push(`Drive: ${bits.join(', ')}`)
+    }
   }
   return parts.length ? parts.join(' · ') : 'Up to date'
 }

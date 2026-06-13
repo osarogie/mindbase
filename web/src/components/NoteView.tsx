@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Save, Trash2, Eye, Edit3, FileCode2 } from 'lucide-react'
+import { Save, Trash2, Eye, Edit3, FileCode2, MessageSquare } from 'lucide-react'
 import { attachmentMarkdownPath } from '@mindbase/editor-ui/attachments/host'
 import type { BridgeMessage } from '@mindbase/editor-ui/bridge'
 import { api, AttachmentEntry, connectWS } from '../api'
+import { CommentsRail } from './CommentsRail'
 import { EditorFooter } from './EditorFooter'
 import { LexicalEditor } from './LexicalEditor'
 import { MarkdownEditor, type MarkdownEditorHandle } from './MarkdownEditor'
@@ -21,6 +22,7 @@ export function NoteView({ path, onDeleted }: Props) {
   const [mode, setMode] = useState<EditorMode>('rich')
   const [attachments, setAttachments] = useState<AttachmentEntry[]>([])
   const [status, setStatus] = useState('')
+  const [commentsOpen, setCommentsOpen] = useState(false)
   const mdRef = useRef<MarkdownEditorHandle>(null)
 
   const load = useCallback(async () => {
@@ -108,6 +110,15 @@ export function NoteView({ path, onDeleted }: Props) {
               <Eye size={16} />
             </button>
           </div>
+          <button
+            type="button"
+            className={`icon-btn ${commentsOpen ? 'is-active' : ''}`}
+            title="Comments"
+            aria-label="Comments"
+            onClick={() => setCommentsOpen((v) => !v)}
+          >
+            <MessageSquare size={16} />
+          </button>
           <button type="button" className="primary" onClick={save} disabled={!dirty}>
             <Save size={16} /> Save
           </button>
@@ -117,14 +128,17 @@ export function NoteView({ path, onDeleted }: Props) {
         </div>
       </header>
 
-      <div className={`editor-pane mode-${mode}`}>
-        {(mode === 'rich' || mode === 'split') && (
-          <LexicalEditor value={content} notePath={path} onChange={setContent} />
-        )}
-        {mode === 'markdown' && <MarkdownEditor ref={mdRef} value={content} onChange={setContent} />}
-        {(mode === 'preview' || mode === 'split') && (
-          <MarkdownPreview content={content} notePath={path} />
-        )}
+      <div className="note-body">
+        <div className={`editor-pane mode-${mode}`}>
+          {(mode === 'rich' || mode === 'split') && (
+            <LexicalEditor value={content} notePath={path} onChange={setContent} />
+          )}
+          {mode === 'markdown' && <MarkdownEditor ref={mdRef} value={content} onChange={setContent} />}
+          {(mode === 'preview' || mode === 'split') && (
+            <MarkdownPreview content={content} notePath={path} />
+          )}
+        </div>
+        <CommentsRail open={commentsOpen} onClose={() => setCommentsOpen(false)} />
       </div>
 
       <EditorFooter

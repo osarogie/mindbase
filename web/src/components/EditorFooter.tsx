@@ -1,4 +1,4 @@
-import { CornerDownLeft, Paperclip, Upload } from 'lucide-react'
+import { CornerDownLeft, Paperclip, Trash2, Upload } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { countStats, readingTimeMinutes } from '@mindbase/editor-ui/textStats'
 import { api, AttachmentEntry } from '../api'
@@ -11,9 +11,10 @@ interface Props {
   saveState: string
   onInsert: (name: string) => void
   onUpload: (file: File) => void
+  onDelete: (name: string) => void
 }
 
-export function EditorFooter({ notePath, mode, content, attachments, saveState, onInsert, onUpload }: Props) {
+export function EditorFooter({ notePath, mode, content, attachments, saveState, onInsert, onUpload, onDelete }: Props) {
   const [bridgeStats, setBridgeStats] = useState({ words: 0, chars: 0 })
   const [expanded, setExpanded] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -61,6 +62,15 @@ export function EditorFooter({ notePath, mode, content, attachments, saveState, 
                   {a.name}
                 </a>
                 <small>{(a.size / 1024).toFixed(1)} KB</small>
+                <button
+                  type="button"
+                  className="icon-btn footer-attachments-delete"
+                  title="Delete attachment"
+                  aria-label={`Delete ${a.name}`}
+                  onClick={() => onDelete(a.name)}
+                >
+                  <Trash2 size={14} />
+                </button>
               </li>
             ))}
           </ul>

@@ -413,6 +413,8 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .footer-attachments li { display: flex; align-items: center; gap: 0.5rem; padding: 0.2rem 0; font-size: 0.9rem; }
 .footer-attachments li a { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .footer-attachments-empty { color: var(--muted-foreground); }
+.footer-attachments-delete { color: var(--muted-foreground); flex-shrink: 0; }
+.footer-attachments-delete:hover { color: var(--destructive, #dc2626); }
 
 .note-body { display: flex; flex: 1; min-height: 0; }
 .note-body .editor-pane { flex: 1; min-width: 0; }

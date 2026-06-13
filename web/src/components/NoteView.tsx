@@ -89,6 +89,16 @@ export function NoteView({ path, onDeleted }: Props) {
     setAttachments(files)
   }
 
+  const deleteAttachment = async (name: string) => {
+    if (!confirm(`Delete attachment "${name}"? This cannot be undone.`)) return
+    try {
+      await api.attachments.delete(path, name)
+      setAttachments(await api.attachments.list(path))
+    } catch (e) {
+      setStatus(String(e))
+    }
+  }
+
   const dirty = content !== saved
 
   return (
@@ -150,6 +160,7 @@ export function NoteView({ path, onDeleted }: Props) {
         saveState={status || (dirty ? 'Unsaved' : 'Saved')}
         onInsert={insertAttachment}
         onUpload={(f) => void upload(f)}
+        onDelete={(name) => void deleteAttachment(name)}
       />
     </div>
   )

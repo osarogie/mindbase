@@ -4,6 +4,9 @@ dist/
 web/dist/
 internal/webui/dist/
 editor-ui/dist/
+# TinyGo WASM build artifacts (produced by `make wasm`)
+web/public/mindbase.wasm
+web/public/wasm_exec.js
 node_modules/
 web/node_modules/
 mobile/node_modules/

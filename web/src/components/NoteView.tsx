@@ -45,10 +45,19 @@ export function NoteView({ path, onDeleted }: Props) {
   }, [path, load])
 
   const save = async () => {
+    // Rich/split modes emit their markdown through a 280ms-debounced bridge
+    // event, so `content` can lag a keystroke behind. Pull the live markdown
+    // straight from the editor to avoid persisting stale text.
+    let current = content
+    if (mode === 'rich' || mode === 'split') {
+      const live = window.mindbaseGetMarkdown?.()
+      if (typeof live === 'string') current = live
+    }
     setStatus('Saving…')
     try {
-      await api.notes.save(path, content)
-      setSaved(content)
+      await api.notes.save(path, current)
+      setContent(current)
+      setSaved(current)
       setStatus('Saved')
       setTimeout(() => setStatus(''), 1500)
     } catch (e) {

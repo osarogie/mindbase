@@ -8,11 +8,12 @@ import {
   $isElementNode,
   $isRangeSelection,
   COMMAND_PRIORITY_LOW,
+  FOCUS_COMMAND,
   createCommand,
   type LexicalCommand,
   type LexicalNode,
 } from 'lexical'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { isImagePath, useAttachmentHost } from '../attachments/host'
 import { postBridge } from '../bridge'
 import { $createFileCardNode, $isFileCardNode, FileCardNode } from '../nodes/FileCardNode'
@@ -47,6 +48,23 @@ export function $insertAttachmentNode(path: string, label = ''): ImageNode | Fil
 export function AttachmentPlugin() {
   const [editor] = useLexicalComposerContext()
   const host = useAttachmentHost()
+  // Whether the editor has ever held focus. If not, the selection is still the
+  // default doc-start position, so a programmatic insert (e.g. the footer
+  // attachments panel) should land at the end of the document, not the top.
+  const everFocused = useRef(false)
+
+  useEffect(
+    () =>
+      editor.registerCommand(
+        FOCUS_COMMAND,
+        () => {
+          everFocused.current = true
+          return false
+        },
+        COMMAND_PRIORITY_LOW,
+      ),
+    [editor],
+  )
 
   useEffect(() => {
     window.mindbaseInsertAttachment = (path: string) => {
@@ -62,6 +80,9 @@ export function AttachmentPlugin() {
       INSERT_ATTACHMENT_COMMAND,
       ({ path, label }) => {
         editor.update(() => {
+          // Never-focused editor: drop the stale doc-start selection so the
+          // attachment is appended at the end instead of the top.
+          if (!everFocused.current) $getRoot().selectEnd()
           $insertAttachmentNode(path, label)
         })
         return true

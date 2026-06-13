@@ -63,6 +63,10 @@ export function SyncStatus() {
 
   useEffect(() => {
     refresh()
+    // Keep the pipeline view live — auto-sync runs on the server, so poll so
+    // last-sync times and counts stay current while the home screen is open.
+    const id = setInterval(refresh, 30_000)
+    return () => clearInterval(id)
   }, [refresh])
 
   const syncNow = async () => {

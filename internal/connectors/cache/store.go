@@ -4,12 +4,31 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/osarogie/mindbase/internal/vault"
 )
 
 const IndexFile = "index.json"
+
+// Writes to a given cache index are serialized per path so concurrent callers
+// (the background scheduler and a manual sync/reset) can't clobber index.json.
+var (
+	locksMu sync.Mutex
+	locks   = map[string]*sync.Mutex{}
+)
+
+func lockFor(path string) *sync.Mutex {
+	locksMu.Lock()
+	defer locksMu.Unlock()
+	m := locks[path]
+	if m == nil {
+		m = &sync.Mutex{}
+		locks[path] = m
+	}
+	return m
+}
 
 type Index struct {
 	Version int         `json:"version"`
@@ -83,6 +102,15 @@ func (s *Store) Load() (Index, error) {
 }
 
 func (s *Store) Save(idx Index) error {
+	m := lockFor(s.root)
+	m.Lock()
+	defer m.Unlock()
+	return s.saveLocked(idx)
+}
+
+// saveLocked writes the index atomically (temp file + rename) so a concurrent
+// reader never observes a half-written file. Callers must hold the path lock.
+func (s *Store) saveLocked(idx Index) error {
 	if err := os.MkdirAll(s.root, 0o755); err != nil {
 		return err
 	}
@@ -97,24 +125,40 @@ func (s *Store) Save(idx Index) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(filepath.Join(s.root, IndexFile), data, 0o644)
+	tmp := filepath.Join(s.root, IndexFile+".tmp")
+	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+		return err
+	}
+	return os.Rename(tmp, filepath.Join(s.root, IndexFile))
+}
+
+// Update performs an atomic read-modify-write of the index under the path lock,
+// so concurrent mutators can't lose each other's changes.
+func (s *Store) Update(fn func(*Index)) (Index, error) {
+	m := lockFor(s.root)
+	m.Lock()
+	defer m.Unlock()
+	idx, _ := s.Load()
+	fn(&idx)
+	if err := s.saveLocked(idx); err != nil {
+		return idx, err
+	}
+	return idx, nil
 }
 
 // ResetNotion clears the cached Notion page index so the next sync re-imports
 // every page from scratch (e.g. to backfill pages imported before a fix). The
 // GDrive index is left intact. Returns the number of page entries cleared.
 func (s *Store) ResetNotion() (int, error) {
-	// Load returns a usable (empty) index even on a corrupt/unreadable file, so
-	// proceed regardless — clearing is exactly the recovery for a bad index. The
-	// GDrive half of whatever Load returned is preserved.
-	idx, _ := s.Load()
-	n := len(idx.Notion.Pages)
-	idx.Notion.Pages = map[string]NotionPageEntry{}
-	idx.Notion.LastSync = time.Time{}
-	if err := s.Save(idx); err != nil {
-		return 0, err
-	}
-	return n, nil
+	// Atomic read-modify-write: clearing is the recovery for a bad index (Load
+	// yields a usable empty index even if the file is corrupt). GDrive is kept.
+	var n int
+	_, err := s.Update(func(idx *Index) {
+		n = len(idx.Notion.Pages)
+		idx.Notion.Pages = map[string]NotionPageEntry{}
+		idx.Notion.LastSync = time.Time{}
+	})
+	return n, err
 }
 
 func emptyIndex() Index {

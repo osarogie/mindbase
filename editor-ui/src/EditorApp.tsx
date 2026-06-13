@@ -22,6 +22,7 @@ import { ImageNode } from './nodes/ImageNode'
 import { MINDBASE_TOKEN_NODES } from './nodes/mindbaseTokenNodes'
 import { AttachmentPickerPlugin } from './plugins/AttachmentPickerPlugin'
 import { AttachmentPlugin } from './plugins/AttachmentPlugin'
+import { OutlinePlugin } from './plugins/OutlinePlugin'
 import { SlashCommandPlugin } from './plugins/SlashCommandPlugin'
 import { FloatingToolbarPlugin } from './plugins/FloatingToolbarPlugin'
 import { ImmersivePlugin } from './plugins/ImmersivePlugin'
@@ -94,6 +95,7 @@ export function EditorApp({ initialMarkdown, documentKind = 'note', attachmentHo
           <SlashCommandPlugin documentKind={documentKind} />
           <BridgePlugin />
           <AttachmentPlugin />
+          <OutlinePlugin />
           <AttachmentPickerPlugin />
           <ImmersivePlugin />
           <FloatingToolbarPlugin />

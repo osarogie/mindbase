@@ -1,11 +1,45 @@
 package cache
 
 import (
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/osarogie/mindbase/internal/vault"
 )
+
+// Concurrent Update calls must not lose writes or corrupt index.json.
+func TestUpdateConcurrent(t *testing.T) {
+	v, err := vault.Open(t.TempDir())
+	if err != nil {
+		t.Fatalf("open vault: %v", err)
+	}
+	store := New(v)
+
+	const n = 50
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(k int) {
+			defer wg.Done()
+			_, err := store.Update(func(idx *Index) {
+				idx.Notion.Pages[string(rune('a'+k%26))+string(rune('0'+k/26))] = NotionPageEntry{}
+			})
+			if err != nil {
+				t.Errorf("update: %v", err)
+			}
+		}(i)
+	}
+	wg.Wait()
+
+	idx, err := store.Load()
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if len(idx.Notion.Pages) != n {
+		t.Errorf("lost writes under concurrency: got %d pages, want %d", len(idx.Notion.Pages), n)
+	}
+}
 
 func TestResetNotion(t *testing.T) {
 	v, err := vault.Open(t.TempDir())

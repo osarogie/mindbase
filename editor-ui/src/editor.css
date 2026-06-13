@@ -570,3 +570,26 @@ body.mb-immersive-focus .mb-immersive-vignette {
   margin-top: 0.6rem;
   justify-content: flex-end;
 }
+
+.mb-floating-toolbar {
+  flex-direction: column;
+}
+.mb-floating-toolbar-row { display: flex; align-items: center; gap: 2px; }
+.mb-floating-toolbar-select {
+  font: inherit;
+  font-size: 0.85em;
+  border: none;
+  background: transparent;
+  padding: 0.25rem;
+  cursor: pointer;
+}
+.mb-floating-toolbar-linkrow { display: flex; gap: 4px; padding: 4px; }
+.mb-floating-toolbar-linkrow input {
+  font: inherit;
+  font-size: 0.85em;
+  padding: 0.2rem 0.4rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+  min-width: 180px;
+}
+.mb-floating-toolbar-linkrow button { font: inherit; font-size: 0.85em; }

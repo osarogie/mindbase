@@ -13,9 +13,10 @@ import (
 const apiBase = "https://api.notion.com/v1"
 
 type Client struct {
-	token  string
-	http   *http.Client
-	ver    string
+	token string
+	http  *http.Client
+	ver   string
+	base  string
 }
 
 func NewClient(token string) *Client {
@@ -23,6 +24,7 @@ func NewClient(token string) *Client {
 		token: token,
 		http:  &http.Client{Timeout: 60 * time.Second},
 		ver:   "2022-06-28",
+		base:  apiBase,
 	}
 }
 
@@ -73,6 +75,20 @@ type Block struct {
 	Data     map[string]any  `json:"-"`
 }
 
+// UnmarshalJSON keeps the full block object in Raw so the type-specific payload
+// (e.g. paragraph rich_text) survives decoding — the named fields above would
+// otherwise drop it, leaving every imported block empty.
+func (b *Block) UnmarshalJSON(data []byte) error {
+	type alias Block
+	var a alias
+	if err := json.Unmarshal(data, &a); err != nil {
+		return err
+	}
+	*b = Block(a)
+	b.Raw = append(json.RawMessage(nil), data...)
+	return nil
+}
+
 func (c *Client) do(method, path string, body any, out any) error {
 	var r io.Reader
 	if body != nil {
@@ -82,7 +98,11 @@ func (c *Client) do(method, path string, body any, out any) error {
 		}
 		r = bytes.NewReader(b)
 	}
-	req, err := http.NewRequest(method, apiBase+path, r)
+	base := c.base
+	if base == "" {
+		base = apiBase
+	}
+	req, err := http.NewRequest(method, base+path, r)
 	if err != nil {
 		return err
 	}
@@ -113,7 +133,7 @@ func (c *Client) SearchPages() ([]Page, error) {
 	cursor := ""
 	for {
 		body := map[string]any{
-			"filter": map[string]string{"value": "page", "property": "object"},
+			"filter":    map[string]string{"value": "page", "property": "object"},
 			"page_size": 100,
 		}
 		if cursor != "" {
@@ -185,7 +205,12 @@ func (c *Client) BlocksToMarkdown(pageID string, depth int) (string, error) {
 }
 
 func (c *Client) blockLine(b Block, depth int) (string, bool, error) {
-	raw, _ := json.Marshal(b)
+	// Use the raw block JSON (captured in UnmarshalJSON) so the type-specific
+	// payload is present; re-marshaling b would only yield the named fields.
+	raw := []byte(b.Raw)
+	if len(raw) == 0 {
+		raw, _ = json.Marshal(b)
+	}
 	var m map[string]any
 	_ = json.Unmarshal(raw, &m)
 	typ, _ := m["type"].(string)

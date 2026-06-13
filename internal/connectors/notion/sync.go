@@ -25,7 +25,11 @@ func Sync(v *vault.Vault, store *cache.Store, token, subdir string) (*SyncResult
 	if token == "" {
 		return nil, fmt.Errorf("notion token not configured")
 	}
-	client := NewClient(token)
+	return syncWithClient(v, store, NewClient(token), subdir)
+}
+
+// syncWithClient is the testable core of Sync, accepting a pre-built client.
+func syncWithClient(v *vault.Vault, store *cache.Store, client *Client, subdir string) (*SyncResult, error) {
 	pages, err := client.SearchPages()
 	if err != nil {
 		return nil, err

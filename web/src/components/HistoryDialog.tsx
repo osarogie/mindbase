@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, type Commit } from '../api'
 import { MarkdownPreview } from './MarkdownPreview'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
@@ -13,16 +14,19 @@ interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   notePath: string
+  /** Called after restoring a revision so the editor can reload the note. */
+  onRestored?: () => void
 }
 
 /** Browse a note's git-tracked version history (GET /api/history). */
-export function HistoryDialog({ open, onOpenChange, notePath }: Props) {
+export function HistoryDialog({ open, onOpenChange, notePath, onRestored }: Props) {
   const [commits, setCommits] = useState<Commit[]>([])
   const [hasRepo, setHasRepo] = useState(true)
   const [error, setError] = useState('')
   const [selected, setSelected] = useState<Commit | null>(null)
   const [snapshot, setSnapshot] = useState('')
   const [loadingSnap, setLoadingSnap] = useState(false)
+  const [restoring, setRestoring] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -47,6 +51,21 @@ export function HistoryDialog({ open, onOpenChange, notePath }: Props) {
       .then((res) => setSnapshot(res.content))
       .catch((e) => setSnapshot(`_Failed to load snapshot: ${e}_`))
       .finally(() => setLoadingSnap(false))
+  }
+
+  const restore = async () => {
+    if (!selected) return
+    if (!confirm(`Restore the version from ${selected.short}? This saves it as a new revision.`)) return
+    setRestoring(true)
+    try {
+      await api.notes.save(notePath, snapshot)
+      onRestored?.()
+      onOpenChange(false)
+    } catch (e) {
+      setError(String(e))
+    } finally {
+      setRestoring(false)
+    }
   }
 
   const fmtDate = (iso: string) => {
@@ -92,12 +111,23 @@ export function HistoryDialog({ open, onOpenChange, notePath }: Props) {
                 </li>
               ))}
             </ul>
-            <div className="overflow-y-auto">
+            <div className="flex flex-col overflow-hidden">
               {!selected && (
                 <div className="p-2 text-sm text-muted-foreground">Select a revision to preview it.</div>
               )}
               {selected && loadingSnap && <div className="p-2 text-sm text-muted-foreground">Loading…</div>}
-              {selected && !loadingSnap && <MarkdownPreview content={snapshot} notePath={notePath} />}
+              {selected && !loadingSnap && (
+                <>
+                  <div className="mb-2 flex justify-end">
+                    <Button type="button" size="sm" variant="outline" onClick={restore} disabled={restoring}>
+                      {restoring ? 'Restoring…' : 'Restore this version'}
+                    </Button>
+                  </div>
+                  <div className="overflow-y-auto">
+                    <MarkdownPreview content={snapshot} notePath={notePath} />
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}

@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Save, Trash2, Upload, Eye, Edit3, FileCode2 } from 'lucide-react'
+import { Save, Trash2, Upload, Eye, Edit3, FileCode2, CornerDownLeft } from 'lucide-react'
+import { attachmentMarkdownPath } from '@mindbase/editor-ui/attachments/host'
+import type { BridgeMessage } from '@mindbase/editor-ui/bridge'
 import { api, AttachmentEntry, connectWS } from '../api'
 import { LexicalEditor } from './LexicalEditor'
-import { MarkdownEditor } from './MarkdownEditor'
+import { MarkdownEditor, type MarkdownEditorHandle } from './MarkdownEditor'
 import { MarkdownPreview } from './MarkdownPreview'
 
 type EditorMode = 'rich' | 'markdown' | 'preview' | 'split'
@@ -19,6 +21,7 @@ export function NoteView({ path, onDeleted }: Props) {
   const [attachments, setAttachments] = useState<AttachmentEntry[]>([])
   const [status, setStatus] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
+  const mdRef = useRef<MarkdownEditorHandle>(null)
 
   const load = useCallback(async () => {
     const note = await api.notes.get(path)
@@ -55,6 +58,27 @@ export function NoteView({ path, onDeleted }: Props) {
     if (!confirm(`Delete ${path}?`)) return
     await api.notes.delete(path)
     onDeleted()
+  }
+
+  useEffect(() => {
+    const onBridge = (event: Event) => {
+      const msg = (event as CustomEvent<BridgeMessage>).detail
+      if (msg?.type === 'attachment-uploaded') {
+        api.attachments.list(path).then(setAttachments).catch(() => {})
+      }
+    }
+    window.addEventListener('mindbase-editor', onBridge)
+    return () => window.removeEventListener('mindbase-editor', onBridge)
+  }, [path])
+
+  const insertAttachment = (name: string) => {
+    const mdPath = attachmentMarkdownPath(path, name)
+    if (mode === 'markdown') {
+      mdRef.current?.insertText(`![](${mdPath})`)
+      return
+    }
+    // rich + split both render LexicalEditor — insert via its bridge
+    window.mindbaseInsertAttachment?.(mdPath)
   }
 
   const upload = async (file: File) => {
@@ -96,9 +120,9 @@ export function NoteView({ path, onDeleted }: Props) {
 
       <div className={`editor-pane mode-${mode}`}>
         {(mode === 'rich' || mode === 'split') && (
-          <LexicalEditor value={content} onChange={setContent} />
+          <LexicalEditor value={content} notePath={path} onChange={setContent} />
         )}
-        {mode === 'markdown' && <MarkdownEditor value={content} onChange={setContent} />}
+        {mode === 'markdown' && <MarkdownEditor ref={mdRef} value={content} onChange={setContent} />}
         {(mode === 'preview' || mode === 'split') && (
           <MarkdownPreview content={content} notePath={path} />
         )}
@@ -124,6 +148,9 @@ export function NoteView({ path, onDeleted }: Props) {
         <ul>
           {attachments.map((a) => (
             <li key={a.name}>
+              <button type="button" onClick={() => insertAttachment(a.name)} title="Insert into note">
+                <CornerDownLeft size={14} />
+              </button>
               <a href={api.attachments.url(path, a.name)} target="_blank" rel="noreferrer">
                 {a.name}
               </a>

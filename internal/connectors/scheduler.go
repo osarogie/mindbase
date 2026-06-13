@@ -108,6 +108,12 @@ func (s *Service) CacheStats() (map[string]any, error) {
 	return store.Stats(idx), nil
 }
 
+// ResetNotionCache clears the Notion page index so the next sync re-imports
+// every page. Returns the number of cached entries cleared.
+func (s *Service) ResetNotionCache() (int, error) {
+	return cache.New(s.vault).ResetNotion()
+}
+
 func (s *Service) SyncAll(ctx context.Context) (*AllSyncResult, error) {
 	_ = ctx
 	LoadEnvFiles(s.vault)

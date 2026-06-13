@@ -81,6 +81,22 @@ export function ConnectorSettings({ open, onOpenChange, onSaved }: Props) {
     }
   }
 
+  const reimportNotion = async () => {
+    if (!confirm('Re-import every Notion page? This clears the sync cache so all pages are fetched again on the next sync.')) return
+    setSaving(true)
+    setMessage('')
+    try {
+      const { cleared } = await api.connectors.resetNotion()
+      await api.connectors.sync()
+      setMessage(`Re-imported (${cleared} cached pages reset)`)
+      onSaved?.()
+    } catch (e) {
+      setMessage(String(e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
@@ -177,6 +193,16 @@ export function ConnectorSettings({ open, onOpenChange, onSaved }: Props) {
               disabled={!config}
               onChange={(e) => patchConfig({ sync_interval_min: Math.max(1, Number(e.target.value) || 1) })}
             />
+          </div>
+
+          <div className="flex items-center justify-between border-t border-border pt-3">
+            <div>
+              <div className="font-medium">Re-import all from Notion</div>
+              <div className="text-xs text-muted-foreground">Clears the cache and re-fetches every page.</div>
+            </div>
+            <Button type="button" variant="outline" size="sm" onClick={reimportNotion} disabled={saving}>
+              Re-import
+            </Button>
           </div>
         </div>
 

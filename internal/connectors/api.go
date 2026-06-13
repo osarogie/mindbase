@@ -26,6 +26,7 @@ func (a *API) Mount(r chiRouter) {
 	r.Get("/notion/oauth/start", a.handleNotionOAuthStart)
 	r.Get("/notion/oauth/callback", a.handleNotionOAuthCallback)
 	r.Post("/notion/import", a.handleNotionImport)
+	r.Post("/notion/reset", a.handleNotionReset)
 	r.Post("/gdrive/sync", a.handleGDriveSync)
 	r.Post("/sync", a.handleSyncAll)
 	r.Get("/cache", a.handleCache)
@@ -157,6 +158,15 @@ func (a *API) handleNotionImport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, res)
+}
+
+func (a *API) handleNotionReset(w http.ResponseWriter, r *http.Request) {
+	cleared, err := a.svc.ResetNotionCache()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, map[string]any{"cleared": cleared})
 }
 
 func (a *API) handleGDriveSync(w http.ResponseWriter, r *http.Request) {

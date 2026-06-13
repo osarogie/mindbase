@@ -143,6 +143,8 @@ export const api = {
   connectors: {
     status: () => request<ConnectorStatus>('/api/connectors/status'),
     sync: () => request<SyncResult>('/api/connectors/sync', { method: 'POST' }),
+    resetNotion: () =>
+      request<{ cleared: number }>('/api/connectors/notion/reset', { method: 'POST' }),
     credentials: {
       get: () => request<CredentialsView>('/api/connectors/credentials'),
       update: (req: UpdateCredentials) =>

@@ -16,6 +16,20 @@ export function SearchBox({ onNavigate }: Props) {
   const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
   const boxRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // ⌘K / Ctrl+K focuses search from anywhere.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        inputRef.current?.focus()
+        inputRef.current?.select()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   useEffect(() => {
     const q = query.trim()
@@ -62,11 +76,18 @@ export function SearchBox({ onNavigate }: Props) {
       <div className="search-input-row">
         <Search size={14} />
         <input
+          ref={inputRef}
           type="search"
-          placeholder="Search notes & databases"
+          placeholder="Search… (⌘K)"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => results.length && setOpen(true)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              setQuery('')
+              setOpen(false)
+            }
+          }}
           aria-label="Search notes and databases"
         />
         {query && (

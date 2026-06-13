@@ -76,6 +76,20 @@ export function NoteView({ path, onDeleted }: Props) {
     onDeleted()
   }
 
+  // ⌘S / Ctrl+S saves (ref keeps the latest save closure without re-subscribing).
+  const saveRef = useRef(save)
+  saveRef.current = save
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') {
+        e.preventDefault()
+        void saveRef.current()
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
   useEffect(() => {
     const onBridge = (event: Event) => {
       const msg = (event as CustomEvent<BridgeMessage>).detail

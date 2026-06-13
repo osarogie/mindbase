@@ -1,5 +1,6 @@
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { resolveApiUrl } from '@mindbase/editor-ui/attachments/host'
 import { MermaidBlock } from './MermaidBlock'
 import { ExcalidrawBlock } from './ExcalidrawBlock'
 
@@ -45,7 +46,7 @@ export function MarkdownPreview({ content, notePath }: Props) {
           img({ src, alt, ...props }) {
             let resolved = src
             if (notePath && src && !src.startsWith('http') && !src.startsWith('/api/')) {
-              resolved = `/api/files/${notePath}/${src.replace(/^\.\//, '')}`
+              resolved = resolveApiUrl(notePath, src)
             }
             return <img src={resolved} alt={alt ?? ''} {...props} />
           },

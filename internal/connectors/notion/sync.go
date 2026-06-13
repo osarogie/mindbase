@@ -107,11 +107,17 @@ func stablePath(subdir, pageID, title, existing string) string {
 		return filepath.ToSlash(existing)
 	}
 	id := strings.ReplaceAll(pageID, "-", "")
+	if len(id) > 8 {
+		id = id[:8]
+	}
+	if id == "" {
+		id = "page"
+	}
 	base := slug(title)
 	if base == "" {
 		base = "page"
 	}
-	return filepath.ToSlash(filepath.Join(subdir, base+"-"+id[:8]+".md"))
+	return filepath.ToSlash(filepath.Join(subdir, base+"-"+id+".md"))
 }
 
 // Import is a full sync alias for backward compatibility.

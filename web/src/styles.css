@@ -281,35 +281,6 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   border-radius: var(--radius);
 }
 
-.attachments-panel {
-  border-top: 1px solid var(--border);
-  padding: 0.75rem 1rem;
-  background: var(--surface);
-  max-height: 140px;
-  overflow-y: auto;
-}
-
-.attachments-panel h3 {
-  margin: 0 0 0.5rem;
-  font-size: 0.85rem;
-  color: var(--muted-foreground);
-}
-
-.attachments-panel ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.attachments-panel li {
-  display: flex;
-  justify-content: space-between;
-  padding: 0.25rem 0;
-  font-size: 0.9rem;
-}
-
-.attachments-panel a { color: color-mix(in oklch, var(--primary) 85%, black); }
-
 .database-editor {
   flex: 1;
   display: flex;
@@ -417,3 +388,28 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .outline-item:hover { background: var(--surface-2); }
 .outline-item.level-2 { padding-left: 1.5rem; }
 .outline-item.level-3 { padding-left: 2.5rem; }
+
+.editor-footer { border-top: 1px solid var(--border); background: var(--surface); }
+.editor-footer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.35rem 1rem;
+  font-size: 0.8rem;
+  color: var(--muted-foreground);
+}
+.footer-attachments-toggle {
+  font-size: 0.8rem;
+  padding: 0.25rem 0.6rem;
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted-foreground);
+}
+.footer-attachments-toggle.is-open, .footer-attachments-toggle:hover { background: var(--surface-2); border-color: var(--border); }
+.footer-save-state { min-width: 4rem; text-align: right; }
+.footer-attachments { border-bottom: 1px solid var(--border); padding: 0.6rem 1rem; max-height: 160px; overflow-y: auto; }
+.footer-attachments ul { list-style: none; margin: 0.5rem 0 0; padding: 0; }
+.footer-attachments li { display: flex; align-items: center; gap: 0.5rem; padding: 0.2rem 0; font-size: 0.9rem; }
+.footer-attachments li a { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.footer-attachments-empty { color: var(--muted-foreground); }

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Save, Trash2, Upload, Eye, Edit3, FileCode2, CornerDownLeft } from 'lucide-react'
+import { Save, Trash2, Eye, Edit3, FileCode2 } from 'lucide-react'
 import { attachmentMarkdownPath } from '@mindbase/editor-ui/attachments/host'
 import type { BridgeMessage } from '@mindbase/editor-ui/bridge'
 import { api, AttachmentEntry, connectWS } from '../api'
+import { EditorFooter } from './EditorFooter'
 import { LexicalEditor } from './LexicalEditor'
 import { MarkdownEditor, type MarkdownEditorHandle } from './MarkdownEditor'
 import { MarkdownPreview } from './MarkdownPreview'
@@ -20,7 +21,6 @@ export function NoteView({ path, onDeleted }: Props) {
   const [mode, setMode] = useState<EditorMode>('rich')
   const [attachments, setAttachments] = useState<AttachmentEntry[]>([])
   const [status, setStatus] = useState('')
-  const fileRef = useRef<HTMLInputElement>(null)
   const mdRef = useRef<MarkdownEditorHandle>(null)
 
   const load = useCallback(async () => {
@@ -94,7 +94,6 @@ export function NoteView({ path, onDeleted }: Props) {
       <header className="content-header">
         <h2>{path.replace(/\.md$/, '').split('/').pop()}</h2>
         <div className="header-actions">
-          {status && <span className="status">{status}</span>}
           <div className="mode-toggle">
             <button type="button" className={mode === 'rich' ? 'active' : ''} onClick={() => setMode('rich')} title="Rich text">
               <Edit3 size={16} />
@@ -128,37 +127,15 @@ export function NoteView({ path, onDeleted }: Props) {
         )}
       </div>
 
-      <section className="attachments-panel">
-        <h3>Attachments</h3>
-        <div className="attachment-actions">
-          <input
-            ref={fileRef}
-            type="file"
-            hidden
-            onChange={(e) => {
-              const f = e.target.files?.[0]
-              if (f) upload(f)
-              e.target.value = ''
-            }}
-          />
-          <button type="button" onClick={() => fileRef.current?.click()}>
-            <Upload size={14} /> Upload
-          </button>
-        </div>
-        <ul>
-          {attachments.map((a) => (
-            <li key={a.name}>
-              <button type="button" onClick={() => insertAttachment(a.name)} title="Insert into note">
-                <CornerDownLeft size={14} />
-              </button>
-              <a href={api.attachments.url(path, a.name)} target="_blank" rel="noreferrer">
-                {a.name}
-              </a>
-              <small>{(a.size / 1024).toFixed(1)} KB</small>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <EditorFooter
+        notePath={path}
+        mode={mode}
+        content={content}
+        attachments={attachments}
+        saveState={status || (dirty ? 'Unsaved' : 'Saved')}
+        onInsert={insertAttachment}
+        onUpload={(f) => void upload(f)}
+      />
     </div>
   )
 }

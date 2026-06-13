@@ -35,6 +35,33 @@ export interface AttachmentEntry {
   modified: string
 }
 
+export interface ConnectorStatus {
+  notion: {
+    connected: boolean
+    last_import?: string
+    import_dir: string
+    cached_pages: number
+  }
+  gdrive: {
+    connected: boolean
+    last_sync?: string
+    folder_id: string
+    cached_files: number
+  }
+  config: {
+    source: string
+    sink: string
+    auto_sync: boolean
+    sync_interval_min: number
+  }
+}
+
+export interface SyncResult {
+  notion?: { imported: number; updated: number; skipped: number; cached: number; error?: string }
+  gdrive?: { uploaded: number; updated: number; downloaded: number; error?: string }
+  cache?: Record<string, unknown>
+}
+
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init)
   if (!res.ok) {
@@ -90,6 +117,10 @@ export const api = {
       }),
     url: (notePath: string, filename: string) =>
       `/api/files/${notePath}/${filename}`,
+  },
+  connectors: {
+    status: () => request<ConnectorStatus>('/api/connectors/status'),
+    sync: () => request<SyncResult>('/api/connectors/sync', { method: 'POST' }),
   },
 }
 

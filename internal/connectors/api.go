@@ -161,6 +161,11 @@ func (a *API) handleNotionImport(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *API) handleNotionReset(w http.ResponseWriter, r *http.Request) {
+	creds := resolveCredentials(a.svc.Vault(), a.svc.Config())
+	if creds.NotionToken == "" {
+		writeError(w, http.StatusBadRequest, errNotionDisabled)
+		return
+	}
 	cleared, err := a.svc.ResetNotionCache()
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)

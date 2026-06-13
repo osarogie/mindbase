@@ -104,10 +104,10 @@ func (s *Store) Save(idx Index) error {
 // every page from scratch (e.g. to backfill pages imported before a fix). The
 // GDrive index is left intact. Returns the number of page entries cleared.
 func (s *Store) ResetNotion() (int, error) {
-	idx, err := s.Load()
-	if err != nil {
-		return 0, err
-	}
+	// Load returns a usable (empty) index even on a corrupt/unreadable file, so
+	// proceed regardless — clearing is exactly the recovery for a bad index. The
+	// GDrive half of whatever Load returned is preserved.
+	idx, _ := s.Load()
 	n := len(idx.Notion.Pages)
 	idx.Notion.Pages = map[string]NotionPageEntry{}
 	idx.Notion.LastSync = time.Time{}

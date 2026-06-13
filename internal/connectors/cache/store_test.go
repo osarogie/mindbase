@@ -14,7 +14,10 @@ func TestResetNotion(t *testing.T) {
 	}
 	store := New(v)
 
-	idx, _ := store.Load()
+	idx, err := store.Load()
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
 	idx.Notion.Pages["p1"] = NotionPageEntry{Path: "notion/a.md", Title: "A", Modified: time.Now()}
 	idx.Notion.Pages["p2"] = NotionPageEntry{Path: "notion/b.md", Title: "B"}
 	idx.Notion.LastSync = time.Now()

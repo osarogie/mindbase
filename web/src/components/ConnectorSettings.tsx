@@ -87,8 +87,10 @@ export function ConnectorSettings({ open, onOpenChange, onSaved }: Props) {
     setMessage('')
     try {
       const { cleared } = await api.connectors.resetNotion()
-      await api.connectors.sync()
-      setMessage(`Re-imported (${cleared} cached pages reset)`)
+      const result = await api.connectors.sync()
+      // SyncAll returns 200 even when a connector failed — surface those.
+      const err = result.notion?.error || result.gdrive?.error
+      setMessage(err ? `Reset ${cleared}, but sync failed: ${err}` : `Re-imported (${cleared} cached pages reset)`)
       onSaved?.()
     } catch (e) {
       setMessage(String(e))
@@ -200,7 +202,14 @@ export function ConnectorSettings({ open, onOpenChange, onSaved }: Props) {
               <div className="font-medium">Re-import all from Notion</div>
               <div className="text-xs text-muted-foreground">Clears the cache and re-fetches every page.</div>
             </div>
-            <Button type="button" variant="outline" size="sm" onClick={reimportNotion} disabled={saving}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={reimportNotion}
+              disabled={saving || !creds?.notion_token_set}
+              title={creds?.notion_token_set ? undefined : 'Connect Notion first'}
+            >
               Re-import
             </Button>
           </div>

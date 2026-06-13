@@ -62,6 +62,28 @@ export interface SyncResult {
   cache?: Record<string, unknown>
 }
 
+export interface CredentialsView {
+  notion_token_set: boolean
+  notion_token_preview?: string
+  gdrive_connected: boolean
+  gdrive_auth_method?: string
+  google_oauth_configured: boolean
+}
+
+export interface UpdateCredentials {
+  notion_token?: string
+  gdrive_credentials_json?: string
+  clear?: string[]
+}
+
+// Full connector config round-trips opaquely; we only edit a few known fields.
+export type ConnectorConfig = Record<string, unknown> & {
+  auto_sync?: boolean
+  sync_interval_min?: number
+  source?: string
+  sink?: string
+}
+
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, init)
   if (!res.ok) {
@@ -121,6 +143,24 @@ export const api = {
   connectors: {
     status: () => request<ConnectorStatus>('/api/connectors/status'),
     sync: () => request<SyncResult>('/api/connectors/sync', { method: 'POST' }),
+    credentials: {
+      get: () => request<CredentialsView>('/api/connectors/credentials'),
+      update: (req: UpdateCredentials) =>
+        request<CredentialsView>('/api/connectors/credentials', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(req),
+        }),
+    },
+    config: {
+      get: () => request<ConnectorConfig>('/api/connectors/config'),
+      update: (cfg: ConnectorConfig) =>
+        request<ConnectorConfig>('/api/connectors/config', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(cfg),
+        }),
+    },
   },
 }
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ArrowRight, Cloud, FileText, RefreshCw } from 'lucide-react'
+import { ArrowRight, Cloud, FileText, RefreshCw, Settings } from 'lucide-react'
 import { api, type ConnectorStatus, type SyncResult } from '../api'
+import { ConnectorSettings } from './ConnectorSettings'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -50,6 +51,7 @@ export function SyncStatus() {
   const [error, setError] = useState('')
   const [syncing, setSyncing] = useState(false)
   const [lastResult, setLastResult] = useState('')
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   const refresh = useCallback(() => {
     api.connectors
@@ -86,9 +88,13 @@ export function SyncStatus() {
   if (error) {
     return (
       <Card className="w-full max-w-lg">
-        <CardContent className="py-4 text-sm text-muted-foreground">
-          Sync status unavailable: {error}
+        <CardContent className="flex items-center justify-between py-4 text-sm text-muted-foreground">
+          <span>Sync status unavailable: {error}</span>
+          <Button type="button" size="sm" variant="outline" onClick={() => setSettingsOpen(true)}>
+            <Settings className="size-3.5" /> Settings
+          </Button>
         </CardContent>
+        <ConnectorSettings open={settingsOpen} onOpenChange={setSettingsOpen} onSaved={refresh} />
       </Card>
     )
   }
@@ -105,10 +111,21 @@ export function SyncStatus() {
             <FileText className="size-4" /> Notion <ArrowRight className="size-3.5" /> Google Drive{' '}
             <Cloud className="size-4" />
           </span>
-          <Button type="button" size="sm" variant="outline" onClick={syncNow} disabled={syncing}>
-            <RefreshCw className={`size-3.5 ${syncing ? 'animate-spin' : ''}`} />
-            {syncing ? 'Syncing…' : 'Sync now'}
-          </Button>
+          <span className="flex items-center gap-1.5">
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => setSettingsOpen(true)}
+              aria-label="Sync settings"
+            >
+              <Settings className="size-3.5" />
+            </Button>
+            <Button type="button" size="sm" variant="outline" onClick={syncNow} disabled={syncing}>
+              <RefreshCw className={`size-3.5 ${syncing ? 'animate-spin' : ''}`} />
+              {syncing ? 'Syncing…' : 'Sync now'}
+            </Button>
+          </span>
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
@@ -141,6 +158,7 @@ export function SyncStatus() {
           {lastResult && ` · ${lastResult}`}
         </p>
       </CardContent>
+      <ConnectorSettings open={settingsOpen} onOpenChange={setSettingsOpen} onSaved={refresh} />
     </Card>
   )
 }

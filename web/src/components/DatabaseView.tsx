@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Eye, Table2, Trash2 } from 'lucide-react'
+import { Columns2, Eye, Table2, Trash2 } from 'lucide-react'
 import { api, DatabaseTable, connectWS } from '../api'
 import { DatabaseEditor } from './DatabaseEditor'
 import { MarkdownPreview } from './MarkdownPreview'
@@ -90,7 +90,7 @@ export function DatabaseView({ name, onDeleted }: Props) {
             {(
               [
                 ['grid', 'Table', Table2],
-                ['split', 'Split', Eye],
+                ['split', 'Split', Columns2],
                 ['preview', 'Preview', Eye],
               ] as const
             ).map(([id, label, Icon]) => (

@@ -2,6 +2,7 @@ import { FileText, Database, Paperclip, Plus, Menu, X } from 'lucide-react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { NoteEntry, DatabaseEntry } from '../api'
 import { SearchBox } from './SearchBox'
+import { ThemeToggle } from './ThemeToggle'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
@@ -47,9 +48,12 @@ export function Sidebar({
         <div className="sidebar-header">
           <h1>mindbase</h1>
           {vaultName && <Badge variant="secondary">{vaultName}</Badge>}
-          <button type="button" className="icon-btn mobile-only" onClick={onToggle} aria-label="Close">
-            <X size={20} />
-          </button>
+          <span className="ml-auto flex items-center gap-1">
+            <ThemeToggle />
+            <button type="button" className="icon-btn mobile-only" onClick={onToggle} aria-label="Close">
+              <X size={20} />
+            </button>
+          </span>
         </div>
 
         <SearchBox onNavigate={onToggle} />

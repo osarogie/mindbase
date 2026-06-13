@@ -457,3 +457,116 @@ body.mb-immersive-focus .mb-immersive-vignette {
     background: #f4f4f5;
   }
 }
+
+/* Attachment embeds */
+.mb-embed {
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: middle;
+}
+
+.mb-embed-image {
+  max-width: 100%;
+  max-height: 480px;
+  border-radius: 8px;
+  display: block;
+}
+
+.mb-embed-image-broken {
+  min-width: 120px;
+  min-height: 40px;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.mb-attachment-pending {
+  display: inline-block;
+  padding: 0.2em 0.6em;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.06);
+  font-style: italic;
+  opacity: 0.75;
+}
+
+.mb-file-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  padding: 0.3em 0.7em;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.55);
+  text-decoration: none;
+  color: inherit;
+}
+
+.mb-file-card:hover {
+  border-color: rgba(0, 0, 0, 0.3);
+}
+
+.mb-file-card-label {
+  font-size: 0.92em;
+}
+
+/* Attachment picker */
+.mb-attach-picker-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 60;
+}
+
+.mb-attach-picker {
+  width: min(420px, 92vw);
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  background: #fffdf8;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+  padding: 0.9rem;
+}
+
+.mb-attach-picker-title {
+  font-weight: 600;
+  margin-bottom: 0.6rem;
+}
+
+.mb-attach-picker-list {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.mb-attach-picker-item,
+.mb-attach-picker-upload,
+.mb-attach-picker-actions button {
+  font: inherit;
+  text-align: left;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.mb-attach-picker-item:hover,
+.mb-attach-picker-upload:hover {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.mb-attach-picker-empty {
+  opacity: 0.6;
+  padding: 0.45rem 0.6rem;
+}
+
+.mb-attach-picker-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+  justify-content: flex-end;
+}

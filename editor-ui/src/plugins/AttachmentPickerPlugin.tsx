@@ -14,6 +14,7 @@ export function AttachmentPickerPlugin() {
   const [open, setOpen] = useState(false)
   const [files, setFiles] = useState<AttachmentInfo[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
+  const uploadButtonRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     return editor.registerCommand(
@@ -29,6 +30,19 @@ export function AttachmentPickerPlugin() {
       COMMAND_PRIORITY_LOW,
     )
   }, [editor, host])
+
+  useEffect(() => {
+    if (!open) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [open])
+
+  useEffect(() => {
+    if (open) uploadButtonRef.current?.focus()
+  }, [open])
 
   if (!open || !host) return null
 
@@ -71,7 +85,7 @@ export function AttachmentPickerPlugin() {
               e.target.value = ''
             }}
           />
-          <button type="button" className="mb-attach-picker-upload" onClick={() => inputRef.current?.click()}>
+          <button ref={uploadButtonRef} type="button" className="mb-attach-picker-upload" onClick={() => inputRef.current?.click()}>
             Upload file…
           </button>
           <button type="button" onClick={() => setOpen(false)}>Cancel</button>

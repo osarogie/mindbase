@@ -212,7 +212,12 @@ export function NoteView({ path, onDeleted }: Props) {
         onDelete={(name) => void deleteAttachment(name)}
       />
 
-      <HistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} notePath={path} />
+      <HistoryDialog
+        open={historyOpen}
+        onOpenChange={setHistoryOpen}
+        notePath={path}
+        onRestored={() => void load()}
+      />
     </div>
   )
 }

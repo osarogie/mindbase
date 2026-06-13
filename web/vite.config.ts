@@ -4,7 +4,16 @@ import tailwindcss from '@tailwindcss/vite'
 import { resolve } from 'node:path'
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react({
+      babel: {
+        // React Compiler — auto-memoizes components/hooks. target '18' uses the
+        // react-compiler-runtime polyfill since this app is on React 18.
+        plugins: [['babel-plugin-react-compiler', { target: '18' }]],
+      },
+    }),
+    tailwindcss(),
+  ],
   resolve: {
     alias: {
       '@': resolve(__dirname, './src'),

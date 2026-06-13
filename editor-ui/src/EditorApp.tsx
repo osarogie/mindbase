@@ -22,6 +22,7 @@ import { ImageNode } from './nodes/ImageNode'
 import { MINDBASE_TOKEN_NODES } from './nodes/mindbaseTokenNodes'
 import { AttachmentPickerPlugin } from './plugins/AttachmentPickerPlugin'
 import { AttachmentPlugin } from './plugins/AttachmentPlugin'
+import { CheckListShortcutPlugin } from './plugins/CheckListShortcutPlugin'
 import { OutlinePlugin } from './plugins/OutlinePlugin'
 import { SlashCommandPlugin } from './plugins/SlashCommandPlugin'
 import { FloatingToolbarPlugin } from './plugins/FloatingToolbarPlugin'
@@ -92,6 +93,7 @@ export function EditorApp({ initialMarkdown, documentKind = 'note', attachmentHo
           <CheckListPlugin />
           <LinkPlugin />
           <MarkdownShortcutPlugin transformers={MINDBASE_TRANSFORMERS} />
+          <CheckListShortcutPlugin />
           <SlashCommandPlugin documentKind={documentKind} />
           <BridgePlugin />
           <AttachmentPlugin />

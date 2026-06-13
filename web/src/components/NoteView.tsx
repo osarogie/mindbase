@@ -128,6 +128,7 @@ export function NoteView({ path, onDeleted }: Props) {
       </div>
 
       <EditorFooter
+        key={path}
         notePath={path}
         mode={mode}
         content={content}

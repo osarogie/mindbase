@@ -141,7 +141,7 @@ export function NoteView({ path, onDeleted }: Props) {
           <button type="button" className="primary" onClick={save} disabled={!dirty}>
             <Save size={16} /> Save
           </button>
-          <button type="button" onClick={remove} className="danger">
+          <button type="button" onClick={remove} className="danger" title="Delete note" aria-label="Delete note">
             <Trash2 size={16} />
           </button>
         </div>

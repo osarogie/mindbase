@@ -55,7 +55,13 @@ export function EditorFooter({ notePath, mode, content, attachments, saveState, 
             {attachments.length === 0 && <li className="footer-attachments-empty">No attachments</li>}
             {attachments.map((a) => (
               <li key={a.name}>
-                <button type="button" className="icon-btn" title="Insert into note" onClick={() => onInsert(a.name)}>
+                <button
+                  type="button"
+                  className="icon-btn"
+                  title="Insert into note"
+                  aria-label={`Insert ${a.name} into note`}
+                  onClick={() => onInsert(a.name)}
+                >
                   <CornerDownLeft size={14} />
                 </button>
                 <a href={api.attachments.url(notePath, a.name)} target="_blank" rel="noreferrer">

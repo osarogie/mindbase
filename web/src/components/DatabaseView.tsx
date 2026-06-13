@@ -110,7 +110,7 @@ export function DatabaseView({ name, onDeleted }: Props) {
           {status && (
             <span className="text-sm text-muted-foreground">{status}</span>
           )}
-          <Button type="button" variant="destructive" size="icon-sm" onClick={remove}>
+          <Button type="button" variant="destructive" size="icon-sm" onClick={remove} title="Delete database" aria-label="Delete database">
             <Trash2 className="size-4" />
           </Button>
         </div>

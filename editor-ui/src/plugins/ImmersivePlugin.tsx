@@ -15,7 +15,6 @@ function readPlainText(editor: ReturnType<typeof useLexicalComposerContext>[0]):
 export function ImmersivePlugin() {
   const [editor] = useLexicalComposerContext()
   const [focused, setFocused] = useState(false)
-  const [stats, setStats] = useState({ words: 0, chars: 0 })
 
   useEffect(() => {
     const root = editor.getRootElement()
@@ -23,7 +22,6 @@ export function ImmersivePlugin() {
 
     const publishStats = () => {
       const next = countStats(readPlainText(editor))
-      setStats(next)
       postBridge({ type: 'stats', words: next.words, chars: next.chars })
     }
 
@@ -59,21 +57,15 @@ export function ImmersivePlugin() {
       if (timer) clearTimeout(timer)
       timer = setTimeout(() => {
         const next = countStats(readPlainText(editor))
-        setStats(next)
         postBridge({ type: 'stats', words: next.words, chars: next.chars })
       }, 200)
     })
   }, [editor])
 
-  const hint = focused ? `${stats.words} words` : 'Tap to write · / for blocks'
-
   return (
     <>
       <div className="mb-immersive-vignette" aria-hidden="true" />
       <div className={`mb-immersive-rail ${focused ? 'mb-immersive-rail--focus' : ''}`} aria-hidden="true" />
-      <footer className={`mb-immersive-status ${focused ? 'mb-immersive-status--visible' : ''}`}>
-        <span className="mb-immersive-status-text">{hint}</span>
-      </footer>
     </>
   )
 }

@@ -1,4 +1,4 @@
-.PHONY: dev build run run-templ run-react desktop mobile-sync templ tools clean bun-install libmindbase cli icons editor-ui react-ui ui-css legacy-web
+.PHONY: dev build run run-templ run-react desktop mobile-sync templ tools clean bun-install libmindbase cli icons editor-ui react-ui ui-css legacy-web wasm
 
 VAULT ?= ./vault
 ADDR ?= :8780
@@ -74,6 +74,14 @@ react-ui: bun-install
 	bun run web:build
 	rm -rf internal/webui/dist
 	cp -R web/dist internal/webui/dist
+
+# Compile the Go engine to WebAssembly with TinyGo (small, no full Go GC).
+# Outputs web/public/mindbase.wasm + the matching wasm_exec.js loader.
+# Requires tinygo: brew install tinygo-org/tools/tinygo
+wasm:
+	tinygo build -o web/public/mindbase.wasm -target wasm -no-debug ./cmd/wasm
+	cp "$$(tinygo env TINYGOROOT)/targets/wasm_exec.js" web/public/wasm_exec.js
+	@echo "Built web/public/mindbase.wasm"
 
 clean:
 	rm -rf bin/mind bin/mindbase tmp web/dist node_modules mobile/node_modules macos/build web/node_modules bun.lock

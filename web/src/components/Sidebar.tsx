@@ -4,7 +4,7 @@ import { NoteEntry, DatabaseEntry } from '../api'
 import { OutlinePanel } from './OutlinePanel'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { cn } from '@/lib/utils'
+import { cn, safeDecodeURIComponent } from '@/lib/utils'
 
 interface Props {
   notes: NoteEntry[]
@@ -30,7 +30,7 @@ export function Sidebar({
   const notesActive = location.pathname.startsWith('/notes')
   const databasesActive = location.pathname.startsWith('/databases')
   const noteRoutePath = location.pathname.startsWith('/notes/')
-    ? decodeURIComponent(location.pathname.slice('/notes/'.length))
+    ? safeDecodeURIComponent(location.pathname.slice('/notes/'.length))
     : null
 
   const openNote = (path: string) => {

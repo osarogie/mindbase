@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Save, Trash2, Eye, Edit3, FileCode2, MessageSquare, Columns2, ListTree } from 'lucide-react'
+import { Save, Trash2, Eye, Edit3, FileCode2, MessageSquare, Columns2, ListTree, History } from 'lucide-react'
 import { attachmentMarkdownPath } from '@mindbase/editor-ui/attachments/host'
 import type { BridgeMessage } from '@mindbase/editor-ui/bridge'
 import { api, AttachmentEntry, connectWS } from '../api'
 import { CommentsRail } from './CommentsRail'
+import { HistoryDialog } from './HistoryDialog'
 import { OutlinePanel } from './OutlinePanel'
 import { EditorFooter } from './EditorFooter'
 import { LexicalEditor } from './LexicalEditor'
@@ -24,6 +25,7 @@ export function NoteView({ path, onDeleted }: Props) {
   const [attachments, setAttachments] = useState<AttachmentEntry[]>([])
   const [status, setStatus] = useState('')
   const [commentsOpen, setCommentsOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
   // Open by default on desktop; collapsed on small screens (where it overlays).
   const [outlineOpen, setOutlineOpen] = useState(
     () => typeof window === 'undefined' || window.matchMedia('(min-width: 769px)').matches,
@@ -166,6 +168,15 @@ export function NoteView({ path, onDeleted }: Props) {
           >
             <MessageSquare size={16} />
           </button>
+          <button
+            type="button"
+            className="icon-btn"
+            title="Version history"
+            aria-label="Version history"
+            onClick={() => setHistoryOpen(true)}
+          >
+            <History size={16} />
+          </button>
           <button type="button" className="primary" onClick={save} disabled={!dirty}>
             <Save size={16} /> Save
           </button>
@@ -200,6 +211,8 @@ export function NoteView({ path, onDeleted }: Props) {
         onUpload={(f) => void upload(f)}
         onDelete={(name) => void deleteAttachment(name)}
       />
+
+      <HistoryDialog open={historyOpen} onOpenChange={setHistoryOpen} notePath={path} />
     </div>
   )
 }

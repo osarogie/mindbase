@@ -67,6 +67,20 @@ export function ConnectorSettings({ open, onOpenChange, onSaved }: Props) {
   const patchConfig = (patch: Partial<ConnectorConfig>) =>
     setConfig((c) => (c ? { ...c, ...patch } : c))
 
+  const clearCredential = async (key: 'notion_token' | 'gdrive') => {
+    setSaving(true)
+    setMessage('')
+    try {
+      setCreds(await api.connectors.credentials.update({ clear: [key] }))
+      setMessage('Cleared')
+      onSaved?.()
+    } catch (e) {
+      setMessage(String(e))
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
@@ -80,9 +94,21 @@ export function ConnectorSettings({ open, onOpenChange, onSaved }: Props) {
             <label className="flex items-center gap-2 font-medium" htmlFor="notion-token">
               Notion token
               {creds?.notion_token_set && (
-                <Badge variant="secondary" className="gap-1">
-                  <Check className="size-3" /> set
-                </Badge>
+                <>
+                  <Badge variant="secondary" className="gap-1">
+                    <Check className="size-3" /> set
+                  </Badge>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="ml-auto h-auto px-2 py-0.5 text-xs"
+                    onClick={() => clearCredential('notion_token')}
+                    disabled={saving}
+                  >
+                    Clear
+                  </Button>
+                </>
               )}
             </label>
             <Input
@@ -99,9 +125,21 @@ export function ConnectorSettings({ open, onOpenChange, onSaved }: Props) {
             <label className="flex items-center gap-2 font-medium" htmlFor="gdrive-json">
               Google Drive credentials JSON
               {creds?.gdrive_connected && (
-                <Badge variant="secondary" className="gap-1">
-                  <Check className="size-3" /> {creds.gdrive_auth_method || 'connected'}
-                </Badge>
+                <>
+                  <Badge variant="secondary" className="gap-1">
+                    <Check className="size-3" /> {creds.gdrive_auth_method || 'connected'}
+                  </Badge>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="ml-auto h-auto px-2 py-0.5 text-xs"
+                    onClick={() => clearCredential('gdrive')}
+                    disabled={saving}
+                  >
+                    Clear
+                  </Button>
+                </>
               )}
             </label>
             <textarea
@@ -121,6 +159,7 @@ export function ConnectorSettings({ open, onOpenChange, onSaved }: Props) {
               id="auto-sync"
               type="checkbox"
               checked={autoSync}
+              disabled={!config}
               onChange={(e) => patchConfig({ auto_sync: e.target.checked })}
             />
           </div>
@@ -135,6 +174,7 @@ export function ConnectorSettings({ open, onOpenChange, onSaved }: Props) {
               min={1}
               className="w-24"
               value={interval}
+              disabled={!config}
               onChange={(e) => patchConfig({ sync_interval_min: Math.max(1, Number(e.target.value) || 1) })}
             />
           </div>

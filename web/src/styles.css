@@ -366,7 +366,9 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
     z-index: 25;
   }
   .mobile-only { display: inline-flex; }
-  .menu-btn { display: inline-flex; }
+  /* Lift the FAB clear of the editor footer (full-width at the viewport bottom
+     on a note view) so it doesn't cover the save-state indicator. */
+  .menu-btn { display: inline-flex; bottom: 3.75rem; }
   .editor-pane.mode-split { grid-template-columns: 1fr; }
   .editor-pane.mode-split .markdown-preview { display: none; }
 }
@@ -454,5 +456,5 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .icon-btn.is-active { background: var(--surface-2); border-color: var(--border); }
 
 @media (max-width: 768px) {
-  .comments-rail { position: fixed; right: 0; top: 0; bottom: 0; z-index: 35; box-shadow: -8px 0 24px rgba(0, 0, 0, 0.12); }
+  .comments-rail { position: fixed; right: 0; top: 0; bottom: 0; z-index: 35; width: min(300px, 85vw); box-shadow: -8px 0 24px rgba(0, 0, 0, 0.12); }
 }

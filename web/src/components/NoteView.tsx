@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Save, Trash2, Eye, Edit3, FileCode2, MessageSquare } from 'lucide-react'
+import { Save, Trash2, Eye, Edit3, FileCode2, MessageSquare, Columns2 } from 'lucide-react'
 import { attachmentMarkdownPath } from '@mindbase/editor-ui/attachments/host'
 import type { BridgeMessage } from '@mindbase/editor-ui/bridge'
 import { api, AttachmentEntry, connectWS } from '../api'
@@ -123,7 +123,7 @@ export function NoteView({ path, onDeleted }: Props) {
               <FileCode2 size={16} />
             </button>
             <button type="button" className={mode === 'split' ? 'active' : ''} onClick={() => setMode('split')} title="Split">
-              ⬌
+              <Columns2 size={16} />
             </button>
             <button type="button" className={mode === 'preview' ? 'active' : ''} onClick={() => setMode('preview')} title="Preview">
               <Eye size={16} />
@@ -141,7 +141,7 @@ export function NoteView({ path, onDeleted }: Props) {
           <button type="button" className="primary" onClick={save} disabled={!dirty}>
             <Save size={16} /> Save
           </button>
-          <button type="button" onClick={remove} className="danger">
+          <button type="button" onClick={remove} className="danger" title="Delete note" aria-label="Delete note">
             <Trash2 size={16} />
           </button>
         </div>

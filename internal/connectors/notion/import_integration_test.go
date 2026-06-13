@@ -70,11 +70,17 @@ func TestSyncImportsBlockText(t *testing.T) {
 		t.Fatalf("Imported=%d, want 1 (errors=%v)", res.Imported, res.Errors)
 	}
 
-	matches, _ := filepath.Glob(filepath.Join(v.NotesRoot(), "notion", "*.md"))
+	matches, err := filepath.Glob(filepath.Join(v.NotesRoot(), "notion", "*.md"))
+	if err != nil {
+		t.Fatalf("glob: %v", err)
+	}
 	if len(matches) != 1 {
 		t.Fatalf("expected 1 imported file, got %v", matches)
 	}
-	data, _ := os.ReadFile(matches[0])
+	data, err := os.ReadFile(matches[0])
+	if err != nil {
+		t.Fatalf("read imported note: %v", err)
+	}
 	if !strings.Contains(string(data), "Hello world") {
 		t.Errorf("imported note is missing the block text 'Hello world':\n%s", data)
 	}
@@ -103,7 +109,10 @@ func TestSyncIsIdempotent(t *testing.T) {
 	if res2.Imported != 0 {
 		t.Errorf("second sync Imported=%d, want 0 (should be cached)", res2.Imported)
 	}
-	matches, _ := filepath.Glob(filepath.Join(v.NotesRoot(), "notion", "*.md"))
+	matches, err := filepath.Glob(filepath.Join(v.NotesRoot(), "notion", "*.md"))
+	if err != nil {
+		t.Fatalf("glob: %v", err)
+	}
 	if len(matches) != 1 {
 		t.Errorf("expected 1 file after re-sync, got %d: %v", len(matches), matches)
 	}

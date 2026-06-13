@@ -13,8 +13,10 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    host: true,
     proxy: {
-      '/api': 'http://localhost:8080',
+      // Overridable so the Docker dev container can proxy to the `server` service.
+      '/api': process.env.VITE_API_PROXY || 'http://localhost:8080',
     },
   },
   build: {

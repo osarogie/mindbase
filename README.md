@@ -29,6 +29,16 @@ make cli                  # agent CLI → bin/mind
 
 Default vault for development: `./vault`. Override with `-vault` or `MINDBASE_VAULT`.
 
+## Docker
+
+```bash
+docker compose up --build                              # run mindbase → http://localhost:8780
+docker compose -f docker-compose.dev.yml up --build    # hot-reload dev → http://localhost:5173
+```
+
+- **`docker-compose.yml`** builds the multi-stage `Dockerfile` (React UI embedded in a static, CGO-free Go binary on Alpine, ~95 MB) and bind-mounts `./vault` so your notes persist on the host.
+- **`docker-compose.dev.yml`** runs two hot-reload services: the Go server via `air` on `:8090` and the Vite dev server with HMR on `:5173` (it proxies `/api` to the server). The repo is bind-mounted into both; linux `node_modules` are kept in anonymous volumes so host artifacts don't leak in.
+
 ## Storage
 
 | Type | Location |

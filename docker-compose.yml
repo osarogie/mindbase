@@ -1,0 +1,21 @@
+# Run mindbase in a container with a persistent vault.
+#
+#   docker compose up --build
+#
+# The vault lives in ./vault on the host (bind-mounted), so your notes are
+# edited in place and survive container rebuilds. App at http://localhost:8780
+#
+# For a hot-reload dev environment instead, see docker-compose.dev.yml:
+#   docker compose -f docker-compose.dev.yml up --build
+
+services:
+  mindbase:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mindbase:local
+    ports:
+      - "8780:8780"
+    volumes:
+      - ./vault:/vault
+    restart: unless-stopped

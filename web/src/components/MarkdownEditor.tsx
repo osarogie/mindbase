@@ -1,4 +1,5 @@
-import CodeMirror from '@uiw/react-codemirror'
+import { forwardRef, useImperativeHandle, useRef } from 'react'
+import CodeMirror, { type ReactCodeMirrorRef } from '@uiw/react-codemirror'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
 import { languages } from '@codemirror/language-data'
 
@@ -7,9 +8,29 @@ interface Props {
   onChange: (value: string) => void
 }
 
-export function MarkdownEditor({ value, onChange }: Props) {
+export interface MarkdownEditorHandle {
+  insertText: (text: string) => void
+}
+
+export const MarkdownEditor = forwardRef<MarkdownEditorHandle, Props>(function MarkdownEditor(
+  { value, onChange },
+  ref,
+) {
+  const cmRef = useRef<ReactCodeMirrorRef>(null)
+
+  useImperativeHandle(ref, () => ({
+    insertText: (text: string) => {
+      const view = cmRef.current?.view
+      if (!view) return
+      const pos = view.state.selection.main.head
+      view.dispatch({ changes: { from: pos, insert: text }, selection: { anchor: pos + text.length } })
+      view.focus()
+    },
+  }))
+
   return (
     <CodeMirror
+      ref={cmRef}
       value={value}
       height="100%"
       extensions={[markdown({ base: markdownLanguage, codeLanguages: languages })]}
@@ -17,4 +38,4 @@ export function MarkdownEditor({ value, onChange }: Props) {
       className="markdown-editor"
     />
   )
-}
+})

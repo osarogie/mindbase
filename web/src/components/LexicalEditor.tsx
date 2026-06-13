@@ -1,18 +1,40 @@
-import { memo, useCallback, useEffect, useRef } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef } from 'react'
 import { EditorApp } from '@mindbase/editor-ui/EditorApp'
 import type { BridgeMessage } from '@mindbase/editor-ui/bridge'
+import {
+  attachmentMarkdownPath,
+  resolveApiUrl,
+  type AttachmentHost,
+} from '@mindbase/editor-ui/attachments/host'
+import { api } from '../api'
 import '@mindbase/editor-ui/editor.css'
 
 interface Props {
   value: string
+  notePath: string
   onChange: (markdown: string) => void
 }
 
 /** Lexical rich-text editor — markdown in/out, shared with mobile/macOS WebView shell. */
-export const LexicalEditor = memo(function LexicalEditor({ value, onChange }: Props) {
+export const LexicalEditor = memo(function LexicalEditor({ value, notePath, onChange }: Props) {
   const lastEmitted = useRef(value)
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
+
+  const attachmentHost = useMemo<AttachmentHost>(
+    () => ({
+      upload: async (file) => {
+        const entry = await api.attachments.upload(notePath, file)
+        return { path: attachmentMarkdownPath(notePath, entry.name) }
+      },
+      resolveUrl: (path) => resolveApiUrl(notePath, path),
+      list: async () => {
+        const entries = await api.attachments.list(notePath)
+        return entries.map((a) => ({ name: a.name, path: attachmentMarkdownPath(notePath, a.name) }))
+      },
+    }),
+    [notePath],
+  )
 
   const handleBridge = useCallback((event: Event) => {
     const msg = (event as CustomEvent<BridgeMessage>).detail
@@ -36,7 +58,7 @@ export const LexicalEditor = memo(function LexicalEditor({ value, onChange }: Pr
 
   return (
     <div className="lexical-editor-host">
-      <EditorApp initialMarkdown={value} />
+      <EditorApp initialMarkdown={value} attachmentHost={attachmentHost} />
     </div>
   )
 })

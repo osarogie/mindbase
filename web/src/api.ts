@@ -44,6 +44,22 @@ export interface SearchResult {
   modified: string
 }
 
+export interface Commit {
+  hash: string
+  short: string
+  author: string
+  email: string
+  date: string
+  subject: string
+  files?: string[]
+}
+
+export interface HistoryLog {
+  path: string
+  has_repo: boolean
+  commits: Commit[] | null
+}
+
 export interface ConnectorStatus {
   notion: {
     connected: boolean
@@ -109,6 +125,14 @@ export const api = {
   vault: () => request<{ root: string; name: string }>('/api/vault'),
   search: (q: string) =>
     request<SearchResult[]>(`/api/search?q=${encodeURIComponent(q)}`).then((r) => r ?? []),
+  history: {
+    log: (path: string) =>
+      request<HistoryLog>(`/api/history?path=${encodeURIComponent(path)}`),
+    snapshot: (rev: string, path: string) =>
+      request<{ rev: string; path: string; content: string }>(
+        `/api/history/${rev}?path=${encodeURIComponent(path)}`,
+      ),
+  },
   notes: {
     list: () => request<NoteEntry[]>('/api/notes/'),
     get: (path: string) => request<Note>(`/api/notes/${path}`),

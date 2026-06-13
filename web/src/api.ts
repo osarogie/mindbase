@@ -35,6 +35,15 @@ export interface AttachmentEntry {
   modified: string
 }
 
+export interface SearchResult {
+  path: string
+  title: string
+  type: 'note' | 'database'
+  snippet: string
+  score: number
+  modified: string
+}
+
 export interface ConnectorStatus {
   notion: {
     connected: boolean
@@ -98,6 +107,8 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   vault: () => request<{ root: string; name: string }>('/api/vault'),
+  search: (q: string) =>
+    request<SearchResult[]>(`/api/search?q=${encodeURIComponent(q)}`).then((r) => r ?? []),
   notes: {
     list: () => request<NoteEntry[]>('/api/notes/'),
     get: (path: string) => request<Note>(`/api/notes/${path}`),

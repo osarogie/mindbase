@@ -1,6 +1,7 @@
 import { FileText, Database, Paperclip, Plus, Menu, X } from 'lucide-react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { NoteEntry, DatabaseEntry } from '../api'
+import { SearchBox } from './SearchBox'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
@@ -50,6 +51,8 @@ export function Sidebar({
             <X size={20} />
           </button>
         </div>
+
+        <SearchBox onNavigate={onToggle} />
 
         <div className="view-tabs">
           <NavLink to="/" end className={({ isActive }) => cn(isActive && !notesActive && !databasesActive && 'active')}>

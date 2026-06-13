@@ -1,9 +1,10 @@
 import { FileText, Database, Paperclip, Plus, Menu, X } from 'lucide-react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { NoteEntry, DatabaseEntry } from '../api'
+import { OutlinePanel } from './OutlinePanel'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { cn } from '@/lib/utils'
+import { cn, safeDecodeURIComponent } from '@/lib/utils'
 
 interface Props {
   notes: NoteEntry[]
@@ -28,6 +29,9 @@ export function Sidebar({
   const location = useLocation()
   const notesActive = location.pathname.startsWith('/notes')
   const databasesActive = location.pathname.startsWith('/databases')
+  const noteRoutePath = location.pathname.startsWith('/notes/')
+    ? safeDecodeURIComponent(location.pathname.slice('/notes/'.length))
+    : null
 
   const openNote = (path: string) => {
     navigate(`/notes/${path}`)
@@ -51,6 +55,13 @@ export function Sidebar({
           </button>
         </div>
 
+        {noteRoutePath ? (
+          <OutlinePanel
+            title={noteRoutePath.replace(/\.md$/, '').split('/').pop() ?? noteRoutePath}
+            onBack={() => { navigate('/'); onToggle() }}
+          />
+        ) : (
+          <>
         <div className="view-tabs">
           <NavLink to="/" end className={({ isActive }) => cn(isActive && !notesActive && !databasesActive && 'active')}>
             Library
@@ -108,6 +119,8 @@ export function Sidebar({
             </li>
           ))}
         </ul>
+          </>
+        )}
       </aside>
       <button type="button" className="menu-btn mobile-only" onClick={onToggle} aria-label="Menu">
         <Menu size={20} />

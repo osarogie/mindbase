@@ -115,36 +115,6 @@ body.mb-immersive-focus .mb-immersive-vignette {
   display: none;
 }
 
-.mb-immersive-status {
-  position: fixed;
-  left: 50%;
-  bottom: max(0.85rem, env(safe-area-inset-bottom, 0px) + 0.35rem);
-  transform: translateX(-50%) translateY(12px);
-  z-index: 5;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.25s ease, transform 0.25s ease;
-}
-
-.mb-immersive-status--visible {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
-}
-
-.mb-immersive-status-text {
-  display: inline-block;
-  padding: 0.35rem 0.75rem;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.94);
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95), 0 1px 2px rgba(0, 0, 0, 0.08);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-size: 0.72rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #86868b;
-}
-
 .mb-h1 {
   font-size: clamp(1.85rem, 4vw, 2.35rem);
   font-weight: 700;
@@ -425,14 +395,8 @@ body.mb-immersive-focus .mb-immersive-vignette {
     caret-color: #147a64;
   }
 
-  .mindbase-lexical-placeholder,
-  .mb-immersive-status-text {
+  .mindbase-lexical-placeholder {
     color: #86868b;
-  }
-
-  .mb-immersive-status-text {
-    background: rgba(255, 255, 255, 0.94);
-    border-color: rgba(0, 0, 0, 0.08);
   }
 
   .mb-inline-code {
@@ -570,3 +534,26 @@ body.mb-immersive-focus .mb-immersive-vignette {
   margin-top: 0.6rem;
   justify-content: flex-end;
 }
+
+.mb-floating-toolbar {
+  flex-direction: column;
+}
+.mb-floating-toolbar-row { display: flex; align-items: center; gap: 2px; }
+.mb-floating-toolbar-select {
+  font: inherit;
+  font-size: 0.85em;
+  border: none;
+  background: transparent;
+  padding: 0.25rem;
+  cursor: pointer;
+}
+.mb-floating-toolbar-linkrow { display: flex; gap: 4px; padding: 4px; }
+.mb-floating-toolbar-linkrow input {
+  font: inherit;
+  font-size: 0.85em;
+  padding: 0.2rem 0.4rem;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+  min-width: 180px;
+}
+.mb-floating-toolbar-linkrow button { font: inherit; font-size: 0.85em; }

@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Save, Trash2, Upload, Eye, Edit3, FileCode2, CornerDownLeft } from 'lucide-react'
+import { Save, Trash2, Eye, Edit3, FileCode2, MessageSquare } from 'lucide-react'
 import { attachmentMarkdownPath } from '@mindbase/editor-ui/attachments/host'
 import type { BridgeMessage } from '@mindbase/editor-ui/bridge'
 import { api, AttachmentEntry, connectWS } from '../api'
+import { CommentsRail } from './CommentsRail'
+import { EditorFooter } from './EditorFooter'
 import { LexicalEditor } from './LexicalEditor'
 import { MarkdownEditor, type MarkdownEditorHandle } from './MarkdownEditor'
 import { MarkdownPreview } from './MarkdownPreview'
@@ -20,7 +22,7 @@ export function NoteView({ path, onDeleted }: Props) {
   const [mode, setMode] = useState<EditorMode>('rich')
   const [attachments, setAttachments] = useState<AttachmentEntry[]>([])
   const [status, setStatus] = useState('')
-  const fileRef = useRef<HTMLInputElement>(null)
+  const [commentsOpen, setCommentsOpen] = useState(false)
   const mdRef = useRef<MarkdownEditorHandle>(null)
 
   const load = useCallback(async () => {
@@ -43,10 +45,19 @@ export function NoteView({ path, onDeleted }: Props) {
   }, [path, load])
 
   const save = async () => {
+    // Rich/split modes emit their markdown through a 280ms-debounced bridge
+    // event, so `content` can lag a keystroke behind. Pull the live markdown
+    // straight from the editor to avoid persisting stale text.
+    let current = content
+    if (mode === 'rich' || mode === 'split') {
+      const live = window.mindbaseGetMarkdown?.()
+      if (typeof live === 'string') current = live
+    }
     setStatus('Saving…')
     try {
-      await api.notes.save(path, content)
-      setSaved(content)
+      await api.notes.save(path, current)
+      setContent(current)
+      setSaved(current)
       setStatus('Saved')
       setTimeout(() => setStatus(''), 1500)
     } catch (e) {
@@ -87,6 +98,16 @@ export function NoteView({ path, onDeleted }: Props) {
     setAttachments(files)
   }
 
+  const deleteAttachment = async (name: string) => {
+    if (!confirm(`Delete attachment "${name}"? This cannot be undone.`)) return
+    try {
+      await api.attachments.delete(path, name)
+      setAttachments(await api.attachments.list(path))
+    } catch (e) {
+      setStatus(String(e))
+    }
+  }
+
   const dirty = content !== saved
 
   return (
@@ -94,7 +115,6 @@ export function NoteView({ path, onDeleted }: Props) {
       <header className="content-header">
         <h2>{path.replace(/\.md$/, '').split('/').pop()}</h2>
         <div className="header-actions">
-          {status && <span className="status">{status}</span>}
           <div className="mode-toggle">
             <button type="button" className={mode === 'rich' ? 'active' : ''} onClick={() => setMode('rich')} title="Rich text">
               <Edit3 size={16} />
@@ -109,6 +129,15 @@ export function NoteView({ path, onDeleted }: Props) {
               <Eye size={16} />
             </button>
           </div>
+          <button
+            type="button"
+            className={`icon-btn ${commentsOpen ? 'is-active' : ''}`}
+            title="Comments"
+            aria-label="Comments"
+            onClick={() => setCommentsOpen((v) => !v)}
+          >
+            <MessageSquare size={16} />
+          </button>
           <button type="button" className="primary" onClick={save} disabled={!dirty}>
             <Save size={16} /> Save
           </button>
@@ -118,47 +147,30 @@ export function NoteView({ path, onDeleted }: Props) {
         </div>
       </header>
 
-      <div className={`editor-pane mode-${mode}`}>
-        {(mode === 'rich' || mode === 'split') && (
-          <LexicalEditor value={content} notePath={path} onChange={setContent} />
-        )}
-        {mode === 'markdown' && <MarkdownEditor ref={mdRef} value={content} onChange={setContent} />}
-        {(mode === 'preview' || mode === 'split') && (
-          <MarkdownPreview content={content} notePath={path} />
-        )}
+      <div className="note-body">
+        <div className={`editor-pane mode-${mode}`}>
+          {(mode === 'rich' || mode === 'split') && (
+            <LexicalEditor value={content} notePath={path} onChange={setContent} />
+          )}
+          {mode === 'markdown' && <MarkdownEditor ref={mdRef} value={content} onChange={setContent} />}
+          {(mode === 'preview' || mode === 'split') && (
+            <MarkdownPreview content={content} notePath={path} />
+          )}
+        </div>
+        <CommentsRail open={commentsOpen} onClose={() => setCommentsOpen(false)} />
       </div>
 
-      <section className="attachments-panel">
-        <h3>Attachments</h3>
-        <div className="attachment-actions">
-          <input
-            ref={fileRef}
-            type="file"
-            hidden
-            onChange={(e) => {
-              const f = e.target.files?.[0]
-              if (f) upload(f)
-              e.target.value = ''
-            }}
-          />
-          <button type="button" onClick={() => fileRef.current?.click()}>
-            <Upload size={14} /> Upload
-          </button>
-        </div>
-        <ul>
-          {attachments.map((a) => (
-            <li key={a.name}>
-              <button type="button" onClick={() => insertAttachment(a.name)} title="Insert into note">
-                <CornerDownLeft size={14} />
-              </button>
-              <a href={api.attachments.url(path, a.name)} target="_blank" rel="noreferrer">
-                {a.name}
-              </a>
-              <small>{(a.size / 1024).toFixed(1)} KB</small>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <EditorFooter
+        key={path}
+        notePath={path}
+        mode={mode}
+        content={content}
+        attachments={attachments}
+        saveState={status || (dirty ? 'Unsaved' : 'Saved')}
+        onInsert={insertAttachment}
+        onUpload={(f) => void upload(f)}
+        onDelete={(name) => void deleteAttachment(name)}
+      />
     </div>
   )
 }

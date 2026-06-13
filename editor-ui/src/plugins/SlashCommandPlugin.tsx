@@ -6,7 +6,7 @@ import {
   MenuOption,
   useBasicTypeaheadTriggerMatch,
 } from '@lexical/react/LexicalTypeaheadMenuPlugin'
-import type { TextNode } from 'lexical'
+import { $getSelection, $isRangeSelection, type TextNode } from 'lexical'
 import { runSlashCommand } from '../editorCommands'
 import { OPEN_ATTACHMENT_PICKER_COMMAND } from './AttachmentPickerPlugin'
 import { filterSlashCommands, slashCommandsFor, type SlashCommand, type SlashDocumentKind } from '../slashCommands'
@@ -89,9 +89,15 @@ export function SlashCommandPlugin({ documentKind = 'note' }: Props) {
       matchingString: string,
     ) => {
       editor.update(() => {
-        if (textNodeContainingQuery) {
+        const token = `/${matchingString}`
+        const selection = $getSelection()
+        if ($isRangeSelection(selection) && selection.isCollapsed()) {
+          // Delete the typed "/query" backward from the caret. This is robust
+          // even when the query spans multiple text nodes (e.g. a format split),
+          // which a single-node text-slice removal would mishandle.
+          for (let i = 0; i < token.length; i++) selection.deleteCharacter(true)
+        } else if (textNodeContainingQuery) {
           const text = textNodeContainingQuery.getTextContent()
-          const token = `/${matchingString}`
           const idx = text.lastIndexOf(token)
           if (idx >= 0) {
             const before = text.slice(0, idx)

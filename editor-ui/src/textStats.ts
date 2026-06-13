@@ -14,3 +14,9 @@ export function countStats(text: string) {
     chars: normalized.length,
   }
 }
+
+/** Reading time at 225 wpm: 0 for empty docs, otherwise ceil with a 1-minute floor. */
+export function readingTimeMinutes(words: number): number {
+  if (words <= 0) return 0
+  return Math.max(1, Math.ceil(words / 225))
+}

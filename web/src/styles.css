@@ -281,35 +281,6 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   border-radius: var(--radius);
 }
 
-.attachments-panel {
-  border-top: 1px solid var(--border);
-  padding: 0.75rem 1rem;
-  background: var(--surface);
-  max-height: 140px;
-  overflow-y: auto;
-}
-
-.attachments-panel h3 {
-  margin: 0 0 0.5rem;
-  font-size: 0.85rem;
-  color: var(--muted-foreground);
-}
-
-.attachments-panel ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.attachments-panel li {
-  display: flex;
-  justify-content: space-between;
-  padding: 0.25rem 0;
-  font-size: 0.9rem;
-}
-
-.attachments-panel a { color: color-mix(in oklch, var(--primary) 85%, black); }
-
 .database-editor {
   flex: 1;
   display: flex;
@@ -403,4 +374,85 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 @media (max-width: 480px) {
   .content-header { padding: 0.5rem; }
   .header-actions .primary span { display: none; }
+}
+
+.outline-panel { display: flex; flex-direction: column; overflow-y: auto; flex: 1; padding: 0.75rem; gap: 0.25rem; }
+.outline-back { justify-content: flex-start; background: transparent; border-color: transparent; }
+.outline-back:hover { background: var(--surface-2); }
+.outline-title { font-weight: 600; padding: 0.5rem 0.5rem 0.25rem; }
+.outline-label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted-foreground); padding: 0.25rem 0.5rem; }
+.outline-empty { color: var(--muted-foreground); font-size: 0.85rem; padding: 0.25rem 0.5rem; }
+.outline-list { list-style: none; margin: 0; padding: 0; }
+.outline-list li { margin: 0; }
+.outline-item { width: 100%; justify-content: flex-start; background: transparent; border-color: transparent; font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.outline-item:hover { background: var(--surface-2); }
+.outline-item.level-2 { padding-left: 1.5rem; }
+.outline-item.level-3 { padding-left: 2.5rem; }
+
+.editor-footer { border-top: 1px solid var(--border); background: var(--surface); }
+.editor-footer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.35rem 1rem;
+  font-size: 0.8rem;
+  color: var(--muted-foreground);
+}
+.footer-attachments-toggle {
+  font-size: 0.8rem;
+  padding: 0.25rem 0.6rem;
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted-foreground);
+}
+.footer-attachments-toggle.is-open, .footer-attachments-toggle:hover { background: var(--surface-2); border-color: var(--border); }
+.footer-save-state { min-width: 4rem; text-align: right; }
+.footer-attachments { border-bottom: 1px solid var(--border); padding: 0.6rem 1rem; max-height: 160px; overflow-y: auto; }
+.footer-attachments ul { list-style: none; margin: 0.5rem 0 0; padding: 0; }
+.footer-attachments li { display: flex; align-items: center; gap: 0.5rem; padding: 0.2rem 0; font-size: 0.9rem; }
+.footer-attachments li a { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.footer-attachments-empty { color: var(--muted-foreground); }
+.footer-attachments-delete { color: var(--muted-foreground); flex-shrink: 0; }
+.footer-attachments-delete:hover { color: var(--destructive, #dc2626); }
+
+.note-body { display: flex; flex: 1; min-height: 0; }
+.note-body .editor-pane { flex: 1; min-width: 0; }
+
+.comments-rail {
+  width: 300px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+}
+
+.comments-rail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+}
+
+.comments-rail-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: var(--muted-foreground);
+  text-align: center;
+  padding: 1rem;
+}
+
+.comments-rail-hint { font-size: 0.8rem; }
+
+.icon-btn.is-active { background: var(--surface-2); border-color: var(--border); }
+
+@media (max-width: 768px) {
+  .comments-rail { position: fixed; right: 0; top: 0; bottom: 0; z-index: 35; box-shadow: -8px 0 24px rgba(0, 0, 0, 0.12); }
 }

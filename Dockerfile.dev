@@ -1,0 +1,14 @@
+# syntax=docker/dockerfile:1
+#
+# Dev image for the Go server with `air` hot-reload. The repo is bind-mounted
+# at runtime (see docker-compose.dev.yml); this image only primes the module
+# and tool caches so the first rebuild is fast. air config: .air.toml (:8090).
+FROM golang:1.25-alpine
+RUN apk add --no-cache git ca-certificates
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+# Pre-fetch the pinned tools (air, templ) referenced in go.mod's tool block.
+RUN go tool air -v >/dev/null 2>&1 || true
+EXPOSE 8090
+CMD ["go", "tool", "air"]

@@ -1,0 +1,48 @@
+# Hot-reload dev environment.
+#
+#   docker compose -f docker-compose.dev.yml up --build
+#
+# - Go server with `air`: rebuilds on .go/.templ changes, serves the API on :8090
+# - Vite dev server with HMR on http://localhost:5173 (proxies /api -> server:8090)
+#
+# The repo is bind-mounted into both containers, so edits on the host trigger
+# rebuilds/HMR. The vault is shared from ./vault. Open http://localhost:5173
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: ["go", "tool", "air"]
+    ports:
+      - "8090:8090"
+    environment:
+      - GOFLAGS=-buildvcs=false
+    volumes:
+      - ./:/src
+      - go-build:/root/.cache/go-build
+      - go-mod:/go/pkg/mod
+
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile.dev
+    command: ["bun", "run", "--cwd", "web", "dev", "--host"]
+    ports:
+      - "5173:5173"
+    environment:
+      # Vite proxies /api to the server service (see web/vite.config.ts).
+      - VITE_API_PROXY=http://server:8090
+    volumes:
+      - ./:/app
+      # Preserve the linux-built node_modules from the image (don't let the
+      # host's macOS modules / native binaries leak in via the bind mount).
+      - /app/node_modules
+      - /app/web/node_modules
+      - /app/editor-ui/node_modules
+    depends_on:
+      - server
+
+volumes:
+  go-build:
+  go-mod:

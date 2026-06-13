@@ -1,0 +1,23 @@
+# Build artifacts and local state
+bin/
+tmp/
+web/dist/
+internal/webui/dist/
+**/node_modules/
+
+# Heavy native app workspaces not needed for the server image
+mobile/
+macos/
+desktop/
+
+# Local data and tooling
+vault/
+.git/
+.github/
+.idea/
+.vscode/
+.cursor/
+.serena/
+.superpowers/
+.expo/
+*.log

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Save, Trash2, Eye, Edit3, FileCode2, MessageSquare, Columns2 } from 'lucide-react'
+import { Save, Trash2, Eye, Edit3, FileCode2, MessageSquare, Columns2, ListTree } from 'lucide-react'
 import { attachmentMarkdownPath } from '@mindbase/editor-ui/attachments/host'
 import type { BridgeMessage } from '@mindbase/editor-ui/bridge'
 import { api, AttachmentEntry, connectWS } from '../api'
 import { CommentsRail } from './CommentsRail'
+import { OutlinePanel } from './OutlinePanel'
 import { EditorFooter } from './EditorFooter'
 import { LexicalEditor } from './LexicalEditor'
 import { MarkdownEditor, type MarkdownEditorHandle } from './MarkdownEditor'
@@ -23,6 +24,10 @@ export function NoteView({ path, onDeleted }: Props) {
   const [attachments, setAttachments] = useState<AttachmentEntry[]>([])
   const [status, setStatus] = useState('')
   const [commentsOpen, setCommentsOpen] = useState(false)
+  // Open by default on desktop; collapsed on small screens (where it overlays).
+  const [outlineOpen, setOutlineOpen] = useState(
+    () => typeof window === 'undefined' || window.matchMedia('(min-width: 769px)').matches,
+  )
   const mdRef = useRef<MarkdownEditorHandle>(null)
 
   const load = useCallback(async () => {
@@ -131,6 +136,15 @@ export function NoteView({ path, onDeleted }: Props) {
           </div>
           <button
             type="button"
+            className={`icon-btn ${outlineOpen ? 'is-active' : ''}`}
+            title="Outline"
+            aria-label="Outline"
+            onClick={() => setOutlineOpen((v) => !v)}
+          >
+            <ListTree size={16} />
+          </button>
+          <button
+            type="button"
             className={`icon-btn ${commentsOpen ? 'is-active' : ''}`}
             title="Comments"
             aria-label="Comments"
@@ -157,6 +171,7 @@ export function NoteView({ path, onDeleted }: Props) {
             <MarkdownPreview content={content} notePath={path} />
           )}
         </div>
+        {outlineOpen && <OutlinePanel onClose={() => setOutlineOpen(false)} />}
         <CommentsRail open={commentsOpen} onClose={() => setCommentsOpen(false)} />
       </div>
 

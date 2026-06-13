@@ -1,4 +1,4 @@
-import { ArrowLeft } from 'lucide-react'
+import { ListTree, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 interface OutlineHeading {
@@ -8,12 +8,11 @@ interface OutlineHeading {
 }
 
 interface Props {
-  title: string
-  onBack: () => void
+  onClose?: () => void
 }
 
-/** Document outline shown in the sidebar while a note is open. Fed by 'outline' bridge events. */
-export function OutlinePanel({ title, onBack }: Props) {
+/** Document outline shown as a rail to the right of the editor. Fed by 'outline' bridge events. */
+export function OutlinePanel({ onClose }: Props) {
   const [headings, setHeadings] = useState<OutlineHeading[]>([])
 
   useEffect(() => {
@@ -26,12 +25,17 @@ export function OutlinePanel({ title, onBack }: Props) {
   }, [])
 
   return (
-    <div className="outline-panel">
-      <button type="button" className="outline-back" onClick={onBack}>
-        <ArrowLeft size={16} /> Library
-      </button>
-      <div className="outline-title">{title}</div>
-      <div className="outline-label">Outline</div>
+    <aside className="outline-rail" aria-label="Document outline">
+      <div className="outline-rail-header">
+        <span className="flex items-center gap-1.5">
+          <ListTree size={15} /> Outline
+        </span>
+        {onClose && (
+          <button type="button" className="icon-btn" onClick={onClose} aria-label="Close outline">
+            <X size={16} />
+          </button>
+        )}
+      </div>
       {headings.length === 0 ? (
         <div className="outline-empty">No headings yet</div>
       ) : (
@@ -49,6 +53,6 @@ export function OutlinePanel({ title, onBack }: Props) {
           ))}
         </ul>
       )}
-    </div>
+    </aside>
   )
 }

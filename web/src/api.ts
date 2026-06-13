@@ -65,6 +65,8 @@ export interface SyncResult {
 export interface CredentialsView {
   notion_token_set: boolean
   notion_token_preview?: string
+  notion_oauth_configured: boolean
+  notion_oauth_connected: boolean
   gdrive_connected: boolean
   gdrive_auth_method?: string
   google_oauth_configured: boolean
@@ -162,6 +164,12 @@ export const api = {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(cfg),
         }),
+    },
+    oauth: {
+      gdriveStart: () =>
+        request<{ auth_url: string }>('/api/connectors/gdrive/oauth/start'),
+      notionStart: () =>
+        request<{ auth_url: string }>('/api/connectors/notion/oauth/start'),
     },
   },
 }

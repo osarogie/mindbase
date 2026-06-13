@@ -81,6 +81,31 @@ export function ConnectorSettings({ open, onOpenChange, onSaved }: Props) {
     }
   }
 
+  const connectOAuth = async (provider: 'gdrive' | 'notion') => {
+    setSaving(true)
+    setMessage('')
+    try {
+      const { auth_url } =
+        provider === 'gdrive'
+          ? await api.connectors.oauth.gdriveStart()
+          : await api.connectors.oauth.notionStart()
+      const popup = window.open(auth_url, 'mindbase-oauth', 'width=520,height=680')
+      // Poll for the callback to close the popup, then refresh credentials.
+      const timer = setInterval(() => {
+        if (popup?.closed) {
+          clearInterval(timer)
+          api.connectors.credentials.get().then(setCreds).catch(() => {})
+          setSaving(false)
+          setMessage('Checked connection')
+          onSaved?.()
+        }
+      }, 800)
+    } catch (e) {
+      setMessage(String(e))
+      setSaving(false)
+    }
+  }
+
   const reimportNotion = async () => {
     if (!confirm('Re-import every Notion page? This clears the sync cache so all pages are fetched again on the next sync.')) return
     setSaving(true)
@@ -137,6 +162,11 @@ export function ConnectorSettings({ open, onOpenChange, onSaved }: Props) {
               onChange={(e) => setNotionToken(e.target.value)}
               autoComplete="off"
             />
+            {creds?.notion_oauth_configured && (
+              <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => connectOAuth('notion')} disabled={saving}>
+                {creds.notion_oauth_connected ? 'Reconnect Notion' : 'Connect with Notion'}
+              </Button>
+            )}
           </div>
 
           <div className="space-y-1.5">
@@ -167,6 +197,11 @@ export function ConnectorSettings({ open, onOpenChange, onSaved }: Props) {
               value={gdriveJson}
               onChange={(e) => setGdriveJson(e.target.value)}
             />
+            {creds?.google_oauth_configured && (
+              <Button type="button" variant="outline" size="sm" className="w-full" onClick={() => connectOAuth('gdrive')} disabled={saving}>
+                {creds.gdrive_connected ? 'Reconnect Google Drive' : 'Connect with Google'}
+              </Button>
+            )}
           </div>
 
           <div className="flex items-center justify-between">

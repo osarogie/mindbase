@@ -13,6 +13,7 @@ export function MermaidBlock({ code }: { code: string }) {
   const [theme, setTheme] = useState(currentTheme)
 
   useEffect(() => {
+    if (typeof window === 'undefined') return
     const onTheme = () => setTheme(currentTheme())
     window.addEventListener(THEME_EVENT, onTheme)
     return () => window.removeEventListener(THEME_EVENT, onTheme)

@@ -1,5 +1,6 @@
+import { useMemo } from 'react'
 import { FileText, Database, Paperclip, Plus, Menu, X } from 'lucide-react'
-import { NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { NoteEntry, DatabaseEntry } from '../api'
 import { SearchBox } from './SearchBox'
 import { ThemeToggle } from './ThemeToggle'
@@ -19,6 +20,10 @@ interface Props {
   onNewDatabase: () => void
 }
 
+type FileItem =
+  | { kind: 'note'; key: string; route: string; title: string; modified: string; note: NoteEntry }
+  | { kind: 'database'; key: string; route: string; title: string; modified: string; db: DatabaseEntry }
+
 export function Sidebar({
   notes,
   databases,
@@ -32,18 +37,44 @@ export function Sidebar({
 }: Props) {
   const navigate = useNavigate()
   const location = useLocation()
-  const notesActive = location.pathname.startsWith('/notes')
-  const databasesActive = location.pathname.startsWith('/databases')
 
-  const openNote = (path: string) => {
-    navigate(`/notes/${path}`)
+  // Notes and databases share one recency-sorted list (newest first) so the
+  // whole vault reads as a single stream of files rather than two sections.
+  const items = useMemo<FileItem[]>(() => {
+    const merged: FileItem[] = [
+      ...notes.map((n): FileItem => ({
+        kind: 'note',
+        key: `note:${n.path}`,
+        route: `/notes/${n.path}`,
+        title: n.title,
+        modified: n.modified,
+        note: n,
+      })),
+      ...databases.map((d): FileItem => ({
+        kind: 'database',
+        key: `db:${d.name}`,
+        route: `/databases/${d.name}`,
+        title: d.name,
+        modified: d.modified,
+        db: d,
+      })),
+    ]
+    // Compare as epoch millis rather than raw RFC3339 strings: Go's time.Time
+    // JSON can vary in fractional-second length and timezone offset (Z vs
+    // +hh:mm), which a lexical compare would mis-order for equal instants.
+    const ts = (s: string) => {
+      const t = Date.parse(s)
+      return Number.isNaN(t) ? 0 : t
+    }
+    return merged.sort((a, b) => ts(b.modified) - ts(a.modified))
+  }, [notes, databases])
+
+  const openItem = (route: string) => {
+    navigate(route)
     onToggle()
   }
 
-  const openDatabase = (name: string) => {
-    navigate(`/databases/${name}`)
-    onToggle()
-  }
+  const empty = !error && !loading && items.length === 0
 
   return (
     <>
@@ -62,72 +93,36 @@ export function Sidebar({
 
         <SearchBox onNavigate={onToggle} />
 
-        <div className="view-tabs">
-          <NavLink to="/" end className={({ isActive }) => cn(isActive && !notesActive && !databasesActive && 'active')}>
-            Library
-          </NavLink>
-          <button
-            type="button"
-            className={notesActive ? 'active' : ''}
-            onClick={() => notes[0] && openNote(notes[0].path)}
-          >
-            <FileText size={16} /> Notes
-          </button>
-          <button
-            type="button"
-            className={databasesActive ? 'active' : ''}
-            onClick={() => databases[0] && openDatabase(databases[0].name)}
-          >
-            <Database size={16} /> Databases
-          </button>
+        <div className="new-row">
+          <Button type="button" size="sm" className="flex-1" onClick={onNewNote}>
+            <Plus size={16} /> Note
+          </Button>
+          <Button type="button" size="sm" variant="outline" className="flex-1" onClick={onNewDatabase}>
+            <Plus size={16} /> Database
+          </Button>
         </div>
 
-        <Button type="button" className="mx-3 mb-2 w-[calc(100%-1.5rem)]" size="sm" onClick={onNewNote}>
-          <Plus size={16} /> New note
-        </Button>
         <ul className="item-list flex-1 overflow-y-auto">
           {error && (
             <li className="item-list-empty item-list-error">
               Couldn’t load the vault. Check the server and retry.
             </li>
           )}
-          {!error && loading && <li className="item-list-empty">Loading notes…</li>}
-          {!error && !loading && notes.length === 0 && (
-            <li className="item-list-empty">No notes yet. Create your first note above.</li>
-          )}
-          {notes.map((n) => (
-            <li key={n.path}>
-              <button
-                type="button"
-                className={location.pathname === `/notes/${n.path}` ? 'active' : ''}
-                onClick={() => openNote(n.path)}
-              >
-                <FileText size={14} />
-                <span>{n.title}</span>
-                {n.hasAttachments && <Paperclip size={12} />}
-              </button>
-            </li>
-          ))}
-        </ul>
-
-        <Button type="button" variant="outline" className="mx-3 mb-2 mt-2 w-[calc(100%-1.5rem)]" size="sm" onClick={onNewDatabase}>
-          <Plus size={16} /> New database
-        </Button>
-        <ul className="item-list max-h-48 overflow-y-auto border-t border-border">
           {!error && loading && <li className="item-list-empty">Loading…</li>}
-          {!error && !loading && databases.length === 0 && (
-            <li className="item-list-empty">No databases yet.</li>
+          {empty && (
+            <li className="item-list-empty">No files yet. Create a note or database above.</li>
           )}
-          {databases.map((d) => (
-            <li key={d.name}>
+          {items.map((item) => (
+            <li key={item.key}>
               <button
                 type="button"
-                className={location.pathname === `/databases/${d.name}` ? 'active' : ''}
-                onClick={() => openDatabase(d.name)}
+                className={location.pathname === item.route ? 'active' : ''}
+                onClick={() => openItem(item.route)}
               >
-                <Database size={14} />
-                <span>{d.name}</span>
-                <small>{d.rows} rows</small>
+                {item.kind === 'note' ? <FileText size={14} /> : <Database size={14} />}
+                <span>{item.title}</span>
+                {item.kind === 'note' && item.note.hasAttachments && <Paperclip size={12} />}
+                {item.kind === 'database' && <small>{item.db.rows} rows</small>}
               </button>
             </li>
           ))}

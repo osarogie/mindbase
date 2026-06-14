@@ -91,13 +91,18 @@ func mergeDirUp(src, dst string) error {
 			continue
 		}
 		if e.IsDir() {
-			// Destination dir exists — merge into it, then drop the emptied source.
-			if err := mergeDirUp(from, to); err != nil {
-				return err
+			// Merge only when the destination is also a directory. If a file
+			// occupies that name, it's a type collision — leave the source
+			// subtree in place rather than erroring out (and aborting open).
+			if info, err := os.Stat(to); err == nil && info.IsDir() {
+				if err := mergeDirUp(from, to); err != nil {
+					return err
+				}
+				_ = os.Remove(from)
 			}
-			_ = os.Remove(from)
 		}
-		// Destination file already exists: leave the source in place untouched.
+		// Destination already occupied (file, or dir colliding with a file):
+		// leave the source in place untouched. No content is overwritten.
 	}
 	return nil
 }

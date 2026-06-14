@@ -66,6 +66,28 @@ func TestMigrateLegacyLayoutNeverOverwrites(t *testing.T) {
 	}
 }
 
+func TestMigrateLegacyLayoutTypeCollision(t *testing.T) {
+	root := t.TempDir()
+	// Root has a FILE named "sub"; legacy notes/ has a DIRECTORY named "sub".
+	// The migration must not error (which would abort vault open) and must not
+	// overwrite the root file.
+	write(t, filepath.Join(root, "sub"), "ROOT FILE")
+	write(t, filepath.Join(root, "notes", "sub", "deep.md"), "# Deep")
+
+	if _, err := Open(root); err != nil {
+		t.Fatalf("open must not fail on a file/dir name collision: %v", err)
+	}
+
+	got, _ := os.ReadFile(filepath.Join(root, "sub"))
+	if string(got) != "ROOT FILE" {
+		t.Errorf("root file must be preserved, got %q", got)
+	}
+	// The colliding legacy subtree is left intact (not lost).
+	if !exists(filepath.Join(root, "notes", "sub", "deep.md")) {
+		t.Errorf("colliding legacy subtree should be preserved")
+	}
+}
+
 func TestMigrateLegacyLayoutIdempotent(t *testing.T) {
 	root := t.TempDir()
 	write(t, filepath.Join(root, "notes", "a.md"), "# A")

@@ -9,11 +9,6 @@ import (
 	"strings"
 )
 
-const (
-	notesDir     = "notes"
-	databasesDir = "databases"
-)
-
 const defaultGitignore = `.mindbase/secrets.json
 `
 
@@ -61,18 +56,20 @@ func Track(root string, relPaths []string, message string) error {
 	return runGit(root, "commit", "-m", message)
 }
 
-// NotePath returns the vault-relative path for a note file.
+// NotePath returns the vault-relative path for a note file. The vault is a
+// single flat content root, so this is just the cleaned relative path.
 func NotePath(rel string) string {
-	return filepath.ToSlash(filepath.Join(notesDir, rel))
+	return filepath.ToSlash(filepath.Clean(rel))
 }
 
-// DatabasePath returns the vault-relative path for a database file.
+// DatabasePath returns the vault-relative path for a database file (root-relative,
+// with a .csv extension).
 func DatabasePath(name string) string {
 	clean := filepath.Clean(name)
 	if filepath.Ext(clean) != ".csv" {
 		clean += ".csv"
 	}
-	return filepath.ToSlash(filepath.Join(databasesDir, clean))
+	return filepath.ToSlash(clean)
 }
 
 func runGit(root string, args ...string) error {

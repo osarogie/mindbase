@@ -52,6 +52,9 @@ func List(v *vault.Vault) ([]Entry, error) {
 			return err
 		}
 		if d.IsDir() {
+			if vault.IsSkippableDir(d.Name()) {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		ext := strings.ToLower(filepath.Ext(path))

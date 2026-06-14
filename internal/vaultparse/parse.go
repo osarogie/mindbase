@@ -120,7 +120,13 @@ func FindBacklinks(v *vault.Vault, targetPath string) ([]Backlink, error) {
 	root := v.NotesRoot()
 	var links []Backlink
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			if vault.IsSkippableDir(d.Name()) {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		if filepath.Ext(path) != ".md" || strings.Contains(path, ".attachments") {
@@ -165,7 +171,13 @@ func ListTags(v *vault.Vault) ([]TagCount, error) {
 	counts := map[string]int{}
 	root := v.NotesRoot()
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			if vault.IsSkippableDir(d.Name()) {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		if filepath.Ext(path) != ".md" {
@@ -200,7 +212,13 @@ func ListOpenTasks(v *vault.Vault) ([]Task, error) {
 	root := v.NotesRoot()
 	var tasks []Task
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			if vault.IsSkippableDir(d.Name()) {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		if filepath.Ext(path) != ".md" || strings.Contains(path, ".attachments") {

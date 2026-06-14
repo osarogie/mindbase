@@ -36,31 +36,30 @@ func (s *Service) Query(q string) ([]Result, error) {
 	var results []Result
 	terms := strings.Fields(q)
 
-	notesRoot := s.vault.NotesRoot()
-	_ = filepath.WalkDir(notesRoot, func(path string, d os.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
+	// Single flat root: one walk surfaces both notes (.md) and databases (.csv).
+	root := s.vault.NotesRoot()
+	_ = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
 			return nil
 		}
-		if filepath.Ext(path) != ".md" {
+		if d.IsDir() {
+			if vault.IsSkippableDir(d.Name()) {
+				return filepath.SkipDir
+			}
 			return nil
 		}
-		if r := s.searchFile(path, notesRoot, "note", terms, q); r != nil {
-			results = append(results, *r)
+		switch filepath.Ext(path) {
+		case ".md":
+			if r := s.searchFile(path, root, "note", terms, q); r != nil {
+				results = append(results, *r)
+			}
+		case ".csv":
+			if r := s.searchFile(path, root, "database", terms, q); r != nil {
+				results = append(results, *r)
+			}
 		}
 		return nil
 	})
-
-	dbRoot := s.vault.DatabasesRoot()
-	entries, _ := os.ReadDir(dbRoot)
-	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".csv") {
-			continue
-		}
-		path := filepath.Join(dbRoot, e.Name())
-		if r := s.searchFile(path, dbRoot, "database", terms, q); r != nil {
-			results = append(results, *r)
-		}
-	}
 
 	sortResults(results)
 	if results == nil {

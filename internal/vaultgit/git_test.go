@@ -12,10 +12,8 @@ func TestTrackCommitsNoteChange(t *testing.T) {
 		t.Skip("git not installed")
 	}
 	root := t.TempDir()
-	notePath := filepath.Join(root, "notes", "hello.md")
-	if err := os.MkdirAll(filepath.Dir(notePath), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	// Single flat content root: notes live directly under the vault root.
+	notePath := filepath.Join(root, "hello.md")
 	if err := os.WriteFile(notePath, []byte("# hello\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}

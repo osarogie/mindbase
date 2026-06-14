@@ -152,6 +152,22 @@ export const api = {
       request<void>(`/api/notes/${path}`, { method: 'DELETE' }),
     backlinks: (path: string) =>
       request<Backlink[]>(`/api/backlinks/${path}`).then((r) => r ?? []),
+    /**
+     * Fire-and-forget save that survives the page unloading or the editor
+     * unmounting (keepalive). Used to flush unsaved edits when navigating away.
+     */
+    saveBeacon: (path: string, content: string) => {
+      try {
+        void fetch(`/api/notes/${path}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content }),
+          keepalive: true,
+        })
+      } catch {
+        /* best effort */
+      }
+    },
   },
   databases: {
     list: () => request<DatabaseEntry[]>('/api/databases/'),

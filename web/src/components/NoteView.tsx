@@ -34,6 +34,28 @@ export function NoteView({ path, onDeleted }: Props) {
   )
   const mdRef = useRef<MarkdownEditorHandle>(null)
 
+  const dirty = content !== saved
+
+  // Mirror latest values so teardown closures (navigation/unmount) see them.
+  const contentRef = useRef(content)
+  contentRef.current = content
+  const savedRef = useRef(saved)
+  savedRef.current = saved
+  const modeRef = useRef(mode)
+  modeRef.current = mode
+  const dirtyRef = useRef(dirty)
+  dirtyRef.current = dirty
+
+  // Freshest markdown: prefer the live editor (avoids the 280ms bridge lag),
+  // falling back to React state when the editor is gone.
+  const latestContent = useCallback(() => {
+    if (modeRef.current === 'rich' || modeRef.current === 'split') {
+      const live = window.mindbaseGetMarkdown?.()
+      if (typeof live === 'string') return live
+    }
+    return contentRef.current
+  }, [])
+
   const load = useCallback(async () => {
     try {
       const note = await api.notes.get(path)
@@ -41,12 +63,13 @@ export function NoteView({ path, onDeleted }: Props) {
       setSaved(note.content)
     } catch {
       // Following a [[wiki-link]] to a note that doesn't exist yet: start a
-      // blank draft titled from the filename. `saved` stays empty so the draft
-      // is dirty and saving creates the file.
+      // titled draft. `saved` matches it so an untouched draft isn't dirty
+      // (no stray auto-created note); typing makes it dirty and creates it.
       const title = path.replace(/\.md$/, '').split('/').pop() ?? 'Untitled'
-      setContent(`# ${title}\n\n`)
-      setSaved('')
-      setStatus('New note — start typing, then save to create it.')
+      const draft = `# ${title}\n\n`
+      setContent(draft)
+      setSaved(draft)
+      setStatus('New note — start typing to create it.')
     }
     const files = await api.attachments.list(path).catch(() => [])
     setAttachments(files)
@@ -59,7 +82,9 @@ export function NoteView({ path, onDeleted }: Props) {
 
   useEffect(() => {
     const ws = connectWS((type, p) => {
-      if (type === 'note' && p.endsWith(path)) load()
+      // Don't reload over in-progress local edits (also avoids a self-reload
+      // echo from our own autosave write).
+      if (type === 'note' && p.endsWith(path) && !dirtyRef.current) load()
     })
     return () => ws.close()
   }, [path, load])
@@ -105,6 +130,44 @@ export function NoteView({ path, onDeleted }: Props) {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
+  // Autosave persists the live editor markdown and advances the `saved`
+  // baseline only — it never calls setContent, so a slow round-trip can't push
+  // a stale snapshot back into the editor and clobber newer keystrokes.
+  const autosave = useCallback(async () => {
+    const current = latestContent()
+    if (current === savedRef.current) return
+    try {
+      await api.notes.save(path, current)
+      savedRef.current = current
+      setSaved(current)
+      setStatus('Saved')
+      setTimeout(() => setStatus(''), 1200)
+    } catch (e) {
+      setStatus(String(e))
+    }
+  }, [path, latestContent])
+
+  // Debounced autosave: persist ~1.2s after the user stops editing.
+  useEffect(() => {
+    if (!dirty) return
+    const t = setTimeout(() => void autosave(), 1200)
+    return () => clearTimeout(t)
+  }, [content, dirty, autosave])
+
+  // Flush unsaved edits when leaving the note (path change / unmount) or
+  // closing the tab — so navigating away before autosave never loses changes.
+  useEffect(() => {
+    const flush = () => {
+      const latest = latestContent()
+      if (latest !== savedRef.current) api.notes.saveBeacon(path, latest)
+    }
+    window.addEventListener('beforeunload', flush)
+    return () => {
+      window.removeEventListener('beforeunload', flush)
+      flush()
+    }
+  }, [path, latestContent])
+
   useEffect(() => {
     const onBridge = (event: Event) => {
       const msg = (event as CustomEvent<BridgeMessage>).detail
@@ -141,8 +204,6 @@ export function NoteView({ path, onDeleted }: Props) {
       setStatus(String(e))
     }
   }
-
-  const dirty = content !== saved
 
   return (
     <div className="note-view">

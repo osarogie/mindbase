@@ -165,6 +165,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   font-size: 0.8rem;
   line-height: 1.4;
 }
+.item-list-error { color: var(--destructive); }
 
 .main {
   flex: 1;

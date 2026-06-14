@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { EditorApp } from '@mindbase/editor-ui/EditorApp'
 import type { BridgeMessage } from '@mindbase/editor-ui/bridge'
 import {
@@ -7,6 +8,7 @@ import {
   type AttachmentHost,
 } from '@mindbase/editor-ui/attachments/host'
 import { api } from '../api'
+import { wikiTargetToPath } from '../lib/wikilink'
 import '@mindbase/editor-ui/editor.css'
 
 interface Props {
@@ -17,6 +19,8 @@ interface Props {
 
 /** Lexical rich-text editor — markdown in/out, shared with mobile/macOS WebView shell. */
 export const LexicalEditor = memo(function LexicalEditor({ value, notePath, onChange }: Props) {
+  const navigate = useNavigate()
+  const hostRef = useRef<HTMLDivElement>(null)
   const lastEmitted = useRef(value)
   const onChangeRef = useRef(onChange)
   onChangeRef.current = onChange
@@ -56,8 +60,23 @@ export const LexicalEditor = memo(function LexicalEditor({ value, notePath, onCh
     window.mindbaseSetMarkdown?.(value)
   }, [value])
 
+  // Clicking a [[wiki-link]] token navigates to that note (db: embeds excluded).
+  useEffect(() => {
+    const el = hostRef.current
+    if (!el) return
+    const onClick = (e: MouseEvent) => {
+      const link = (e.target as HTMLElement).closest('.mb-wiki-link') as HTMLElement | null
+      const target = link?.getAttribute('data-target')
+      if (!target || target.startsWith('db:')) return
+      e.preventDefault()
+      navigate(`/notes/${wikiTargetToPath(target)}`)
+    }
+    el.addEventListener('click', onClick)
+    return () => el.removeEventListener('click', onClick)
+  }, [navigate])
+
   return (
-    <div className="lexical-editor-host">
+    <div className="lexical-editor-host" ref={hostRef}>
       <EditorApp initialMarkdown={value} attachmentHost={attachmentHost} />
     </div>
   )

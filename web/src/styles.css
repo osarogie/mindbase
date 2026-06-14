@@ -385,6 +385,17 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .outline-item.level-2 { padding-left: 1.5rem; }
 .outline-item.level-3 { padding-left: 2.5rem; }
 
+/* Backlinks rail (shares the outline-rail chrome). */
+.backlink-list { list-style: none; margin: 0; padding: 0.4rem; }
+.backlink-item { display: flex; flex-direction: column; gap: 0.15rem; width: 100%; text-align: left; background: transparent; border: 1px solid transparent; border-radius: 6px; padding: 0.45rem 0.6rem; }
+.backlink-item:hover { background: var(--surface-2); border-color: var(--border); }
+.backlink-title { font-size: 0.85rem; font-weight: 500; }
+.backlink-context { font-size: 0.75rem; color: var(--muted-foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Clickable [[wiki-link]] in rendered markdown. */
+.wiki-link { color: var(--primary); text-decoration: none; border-bottom: 1px solid color-mix(in srgb, var(--primary) 35%, transparent); cursor: pointer; }
+.wiki-link:hover { border-bottom-color: var(--primary); }
+
 .editor-footer { border-top: 1px solid var(--border); background: var(--surface); }
 .editor-footer-bar {
   display: flex;

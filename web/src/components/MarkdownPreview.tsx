@@ -1,7 +1,9 @@
 import { lazy, Suspense } from 'react'
+import { useNavigate } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { resolveApiUrl } from '@mindbase/editor-ui/attachments/host'
+import { wikiLinksToMarkdown, wikiTargetToPath, WIKI_SCHEME } from '@/lib/wikilink'
 
 // Diagram renderers pull in heavy libraries (mermaid ~1.8 MB, excalidraw),
 // so they're code-split and only fetched when a note actually embeds one.
@@ -20,11 +22,35 @@ interface Props {
 }
 
 export function MarkdownPreview({ content, notePath }: Props) {
+  const navigate = useNavigate()
   return (
     <div className="markdown-preview">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
+          a({ href, children, ...props }) {
+            // [[wiki-links]] are rewritten to a `wiki:` scheme; navigate in-app.
+            if (href?.startsWith(WIKI_SCHEME)) {
+              const target = decodeURIComponent(href.slice(WIKI_SCHEME.length))
+              return (
+                <a
+                  href={`/notes/${wikiTargetToPath(target)}`}
+                  className="wiki-link"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    navigate(`/notes/${wikiTargetToPath(target)}`)
+                  }}
+                >
+                  {children}
+                </a>
+              )
+            }
+            return (
+              <a href={href} {...props}>
+                {children}
+              </a>
+            )
+          },
           code({ className, children, ...props }) {
             const match = /language-(\w+)/.exec(className || '')
             const lang = match?.[1]
@@ -70,7 +96,7 @@ export function MarkdownPreview({ content, notePath }: Props) {
           },
         }}
       >
-        {content}
+        {wikiLinksToMarkdown(content)}
       </ReactMarkdown>
     </div>
   )

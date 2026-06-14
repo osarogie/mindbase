@@ -97,6 +97,12 @@ export interface CredentialsView {
   google_oauth_configured: boolean
 }
 
+export interface Backlink {
+  path: string
+  title: string
+  context: string
+}
+
 export interface UpdateCredentials {
   notion_token?: string
   gdrive_credentials_json?: string
@@ -144,6 +150,8 @@ export const api = {
       }),
     delete: (path: string) =>
       request<void>(`/api/notes/${path}`, { method: 'DELETE' }),
+    backlinks: (path: string) =>
+      request<Backlink[]>(`/api/backlinks/${path}`).then((r) => r ?? []),
   },
   databases: {
     list: () => request<DatabaseEntry[]>('/api/databases/'),

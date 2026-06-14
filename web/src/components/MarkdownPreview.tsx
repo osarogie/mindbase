@@ -1,8 +1,18 @@
+import { lazy, Suspense } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { resolveApiUrl } from '@mindbase/editor-ui/attachments/host'
-import { MermaidBlock } from './MermaidBlock'
-import { ExcalidrawBlock } from './ExcalidrawBlock'
+
+// Diagram renderers pull in heavy libraries (mermaid ~1.8 MB, excalidraw),
+// so they're code-split and only fetched when a note actually embeds one.
+const MermaidBlock = lazy(() =>
+  import('./MermaidBlock').then((m) => ({ default: m.MermaidBlock })),
+)
+const ExcalidrawBlock = lazy(() =>
+  import('./ExcalidrawBlock').then((m) => ({ default: m.ExcalidrawBlock })),
+)
+
+const DiagramFallback = () => <div className="diagram-loading">Loading diagram…</div>
 
 interface Props {
   content: string
@@ -21,10 +31,18 @@ export function MarkdownPreview({ content, notePath }: Props) {
             const code = String(children).replace(/\n$/, '')
 
             if (lang === 'mermaid') {
-              return <MermaidBlock code={code} />
+              return (
+                <Suspense fallback={<DiagramFallback />}>
+                  <MermaidBlock code={code} />
+                </Suspense>
+              )
             }
             if (lang === 'excalidraw') {
-              return <ExcalidrawBlock code={code} />
+              return (
+                <Suspense fallback={<DiagramFallback />}>
+                  <ExcalidrawBlock code={code} />
+                </Suspense>
+              )
             }
 
             const inline = !className

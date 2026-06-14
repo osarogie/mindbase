@@ -278,6 +278,14 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   overflow-x: auto;
 }
 
+.diagram-loading {
+  background: var(--surface-2);
+  border-radius: var(--radius);
+  padding: 1rem;
+  color: var(--muted-foreground, #888);
+  font-size: 0.875rem;
+}
+
 .excalidraw-block {
   height: 400px;
   border: 1px solid var(--border);

@@ -87,7 +87,10 @@ export function WikiLinkTypeaheadPlugin() {
   useEffect(() => {
     const open = query !== null
     if (open && !wasOpen.current && linkSource) {
-      Promise.resolve(linkSource())
+      // Defer the call so a synchronous throw (LinkSource may return a plain
+      // array) is caught here rather than escaping the effect.
+      Promise.resolve()
+        .then(() => linkSource())
         .then(setItems)
         .catch(() => setItems([]))
     }

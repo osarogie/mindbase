@@ -13,6 +13,15 @@ export type LinkSource = () => Promise<LinkSuggestion[]> | LinkSuggestion[]
 
 export const LinkSourceContext = createContext<LinkSource | null>(null)
 
+declare global {
+  interface Window {
+    mindbaseLinkSource?: LinkSource
+  }
+}
+
+/** Context source (web) falls back to a bridge-registered global (WebView shells). */
 export function useLinkSource(): LinkSource | null {
-  return useContext(LinkSourceContext)
+  const fromContext = useContext(LinkSourceContext)
+  if (fromContext) return fromContext
+  return typeof window !== 'undefined' ? (window.mindbaseLinkSource ?? null) : null
 }

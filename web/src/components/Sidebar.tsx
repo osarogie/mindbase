@@ -59,7 +59,14 @@ export function Sidebar({
         db: d,
       })),
     ]
-    return merged.sort((a, b) => b.modified.localeCompare(a.modified))
+    // Compare as epoch millis rather than raw RFC3339 strings: Go's time.Time
+    // JSON can vary in fractional-second length and timezone offset (Z vs
+    // +hh:mm), which a lexical compare would mis-order for equal instants.
+    const ts = (s: string) => {
+      const t = Date.parse(s)
+      return Number.isNaN(t) ? 0 : t
+    }
+    return merged.sort((a, b) => ts(b.modified) - ts(a.modified))
   }, [notes, databases])
 
   const openItem = (route: string) => {
@@ -103,7 +110,7 @@ export function Sidebar({
           )}
           {!error && loading && <li className="item-list-empty">Loading…</li>}
           {empty && (
-            <li className="item-list-empty">No files yet. Create your first note above.</li>
+            <li className="item-list-empty">No files yet. Create a note or database above.</li>
           )}
           {items.map((item) => (
             <li key={item.key}>

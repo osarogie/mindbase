@@ -2,8 +2,12 @@ bin/
 tmp/
 dist/
 web/dist/
-internal/webui/dist/
 editor-ui/dist/
+# Keep a placeholder in the embed dir so `//go:embed all:dist` always compiles;
+# real build output stays ignored. (Re-include the dir that `dist/` excluded.)
+!internal/webui/dist/
+internal/webui/dist/*
+!internal/webui/dist/.gitkeep
 # TinyGo WASM build artifacts (produced by `make wasm`)
 web/public/mindbase.wasm
 web/public/wasm_exec.js

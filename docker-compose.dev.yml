@@ -1,12 +1,19 @@
-# Hot-reload dev environment.
+# Hot-reload dev environment, driven by Docker Compose Watch.
 #
-#   docker compose -f docker-compose.dev.yml up --build
+#   docker compose -f docker-compose.dev.yml watch
 #
-# - Go server with `air`: rebuilds on .go/.templ changes, serves the API on :8090
-# - Vite dev server with HMR on http://localhost:5173 (proxies /api -> server:8090)
+# `watch` builds the images, starts the stack, then streams host file changes
+# into the running containers — no slow recursive bind mount of the whole repo:
 #
-# The repo is bind-mounted into both containers, so edits on the host trigger
-# rebuilds/HMR. The vault is shared from ./vault. Open http://localhost:5173
+# - server: Go API on :8090 via `air`. Edits to .go/.templ/etc. are synced into
+#   /src and air rebuilds the binary. go.mod/go.sum changes rebuild the image.
+# - web: Vite dev server with HMR on http://localhost:5173 (proxies /api ->
+#   server:8090). Edits under web/ and editor-ui/ are synced and HMR'd; a
+#   package.json or bun.lock change rebuilds the image (re-runs bun install).
+#
+# The vault is still a bind mount so notes are edited in place and survive
+# rebuilds. Plain `up --build` also works but without live sync. Open
+# http://localhost:5173. Tail logs with `docker compose -f docker-compose.dev.yml logs -f`.
 
 services:
   server:
@@ -19,9 +26,32 @@ services:
     environment:
       - GOFLAGS=-buildvcs=false
     volumes:
-      - ./:/src
+      # Bidirectional so notes written by the server land back on the host.
+      # (air excludes ./vault from its watch; see .air.toml.)
+      - ./vault:/src/vault
       - go-build:/root/.cache/go-build
       - go-mod:/go/pkg/mod
+    develop:
+      watch:
+        # Sync source into the running container; air (inside) rebuilds.
+        - action: sync
+          path: ./
+          target: /src
+          ignore:
+            - .git/
+            - vault/
+            - node_modules/
+            - web/node_modules/
+            - editor-ui/node_modules/
+            - web/dist/
+            - internal/webui/dist/
+            - bin/
+            - tmp/
+        # Dependency graph changed — rebuild so `go mod download` reruns.
+        - action: rebuild
+          path: ./go.mod
+        - action: rebuild
+          path: ./go.sum
 
   web:
     build:
@@ -33,15 +63,29 @@ services:
     environment:
       # Vite proxies /api to the server service (see web/vite.config.ts).
       - VITE_API_PROXY=http://server:8090
-    volumes:
-      - ./:/app
-      # Preserve the linux-built node_modules from the image (don't let the
-      # host's macOS modules / native binaries leak in via the bind mount).
-      - /app/node_modules
-      - /app/web/node_modules
-      - /app/editor-ui/node_modules
     depends_on:
       - server
+    develop:
+      watch:
+        # Sync the two workspaces Vite serves; HMR picks the changes up.
+        - action: sync
+          path: ./web
+          target: /app/web
+          ignore:
+            - node_modules/
+            - dist/
+        - action: sync
+          path: ./editor-ui
+          target: /app/editor-ui
+          ignore:
+            - node_modules/
+        # Dependency/lockfile changes need a fresh `bun install` -> rebuild.
+        - action: rebuild
+          path: ./bun.lock
+        - action: rebuild
+          path: ./web/package.json
+        - action: rebuild
+          path: ./editor-ui/package.json
 
 volumes:
   go-build:

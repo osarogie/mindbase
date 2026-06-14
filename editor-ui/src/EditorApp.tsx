@@ -15,6 +15,7 @@ import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin'
 import { HeadingNode, QuoteNode } from '@lexical/rich-text'
 import { useEffect } from 'react'
 import { AttachmentHostContext, type AttachmentHost } from './attachments/host'
+import { LinkSourceContext, type LinkSource } from './links/host'
 import { BridgePlugin, registerEditorInstance } from './BridgePlugin'
 import { MINDBASE_TRANSFORMERS } from './markdown/mindbaseTransformers'
 import { FileCardNode } from './nodes/FileCardNode'
@@ -25,6 +26,7 @@ import { AttachmentPlugin } from './plugins/AttachmentPlugin'
 import { CheckListShortcutPlugin } from './plugins/CheckListShortcutPlugin'
 import { OutlinePlugin } from './plugins/OutlinePlugin'
 import { SlashCommandPlugin } from './plugins/SlashCommandPlugin'
+import { WikiLinkTypeaheadPlugin } from './plugins/WikiLinkTypeaheadPlugin'
 import { FloatingToolbarPlugin } from './plugins/FloatingToolbarPlugin'
 import { ImmersivePlugin } from './plugins/ImmersivePlugin'
 import type { SlashDocumentKind } from './slashCommands'
@@ -39,6 +41,7 @@ interface Props {
   initialMarkdown: string
   documentKind?: SlashDocumentKind
   attachmentHost?: AttachmentHost
+  linkSource?: LinkSource
 }
 
 function EditorRefPlugin() {
@@ -49,7 +52,7 @@ function EditorRefPlugin() {
   return null
 }
 
-export function EditorApp({ initialMarkdown, documentKind = 'note', attachmentHost }: Props) {
+export function EditorApp({ initialMarkdown, documentKind = 'note', attachmentHost, linkSource }: Props) {
   return (
     <LexicalComposer
       initialConfig={{
@@ -76,6 +79,7 @@ export function EditorApp({ initialMarkdown, documentKind = 'note', attachmentHo
       }}
     >
       <AttachmentHostContext.Provider value={attachmentHost ?? null}>
+       <LinkSourceContext.Provider value={linkSource ?? null}>
         <div className="mindbase-immersive">
           <div className="mindbase-measure">
             <div className="mindbase-lexical-shell">
@@ -95,6 +99,7 @@ export function EditorApp({ initialMarkdown, documentKind = 'note', attachmentHo
           <MarkdownShortcutPlugin transformers={MINDBASE_TRANSFORMERS} />
           <CheckListShortcutPlugin />
           <SlashCommandPlugin documentKind={documentKind} />
+          <WikiLinkTypeaheadPlugin />
           <BridgePlugin />
           <AttachmentPlugin />
           <OutlinePlugin />
@@ -103,6 +108,7 @@ export function EditorApp({ initialMarkdown, documentKind = 'note', attachmentHo
           <FloatingToolbarPlugin />
           <EditorRefPlugin />
         </div>
+       </LinkSourceContext.Provider>
       </AttachmentHostContext.Provider>
     </LexicalComposer>
   )

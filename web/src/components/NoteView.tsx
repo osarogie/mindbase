@@ -130,12 +130,29 @@ export function NoteView({ path, onDeleted }: Props) {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
+  // Autosave persists the live editor markdown and advances the `saved`
+  // baseline only — it never calls setContent, so a slow round-trip can't push
+  // a stale snapshot back into the editor and clobber newer keystrokes.
+  const autosave = useCallback(async () => {
+    const current = latestContent()
+    if (current === savedRef.current) return
+    try {
+      await api.notes.save(path, current)
+      savedRef.current = current
+      setSaved(current)
+      setStatus('Saved')
+      setTimeout(() => setStatus(''), 1200)
+    } catch (e) {
+      setStatus(String(e))
+    }
+  }, [path, latestContent])
+
   // Debounced autosave: persist ~1.2s after the user stops editing.
   useEffect(() => {
     if (!dirty) return
-    const t = setTimeout(() => void saveRef.current(), 1200)
+    const t = setTimeout(() => void autosave(), 1200)
     return () => clearTimeout(t)
-  }, [content, dirty])
+  }, [content, dirty, autosave])
 
   // Flush unsaved edits when leaving the note (path change / unmount) or
   // closing the tab — so navigating away before autosave never loses changes.

@@ -1,0 +1,3 @@
+# Placeholder so `//go:embed all:dist` in embed.go always compiles, even
+# before the React UI is built. Real assets (index.html, assets/) overwrite
+# this dir via `make react-ui` / the prod Docker build and stay gitignored.

@@ -1,8 +1,9 @@
 # syntax=docker/dockerfile:1
 #
 # Dev image for the Vite dev server (React UI + shared Lexical editor) with HMR.
-# Only dependencies are baked in; source is bind-mounted at runtime and the
-# linux node_modules are preserved via anonymous volumes (docker-compose.dev.yml).
+# Dependencies and source are baked in; `docker compose watch` syncs host edits
+# into /app/web and /app/editor-ui (Vite HMR picks them up) and rebuilds the
+# image when a package.json or the lockfile changes (docker-compose.dev.yml).
 # Build context is the repo root so the bun workspace resolves.
 FROM oven/bun:1
 WORKDIR /app
@@ -13,6 +14,12 @@ COPY web/package.json web/package.json
 COPY editor-ui/package.json editor-ui/package.json
 RUN bun -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json'));p.workspaces=['web','editor-ui'];fs.writeFileSync('package.json',JSON.stringify(p,null,2))" \
  && bun install
+
+# Bake the source in (node_modules excluded via .dockerignore so the linux
+# install above is preserved), then re-trim the workspace list that `COPY`
+# overwrote with the host's full package.json (which references mobile/).
+COPY . .
+RUN bun -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json'));p.workspaces=['web','editor-ui'];fs.writeFileSync('package.json',JSON.stringify(p,null,2))"
 
 EXPOSE 5173
 CMD ["bun", "run", "--cwd", "web", "dev", "--host"]

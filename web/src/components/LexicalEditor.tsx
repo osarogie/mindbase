@@ -7,8 +7,9 @@ import {
   resolveApiUrl,
   type AttachmentHost,
 } from '@mindbase/editor-ui/attachments/host'
+import type { LinkSource } from '@mindbase/editor-ui/links/host'
 import { api } from '../api'
-import { wikiTargetToPath } from '../lib/wikilink'
+import { wikiTargetToPath, pathToWikiTarget } from '../lib/wikilink'
 import '@mindbase/editor-ui/editor.css'
 
 interface Props {
@@ -37,6 +38,17 @@ export const LexicalEditor = memo(function LexicalEditor({ value, notePath, onCh
         return entries.map((a) => ({ name: a.name, path: attachmentMarkdownPath(notePath, a.name) }))
       },
     }),
+    [notePath],
+  )
+
+  // Candidates for the `[[` link picker: every other note, by path/title.
+  const linkSource = useMemo<LinkSource>(
+    () => async () => {
+      const notes = await api.notes.list()
+      return notes
+        .filter((n) => n.path !== notePath)
+        .map((n) => ({ target: pathToWikiTarget(n.path), label: n.title || pathToWikiTarget(n.path) }))
+    },
     [notePath],
   )
 
@@ -77,7 +89,7 @@ export const LexicalEditor = memo(function LexicalEditor({ value, notePath, onCh
 
   return (
     <div className="lexical-editor-host" ref={hostRef}>
-      <EditorApp initialMarkdown={value} attachmentHost={attachmentHost} />
+      <EditorApp initialMarkdown={value} attachmentHost={attachmentHost} linkSource={linkSource} />
     </div>
   )
 })

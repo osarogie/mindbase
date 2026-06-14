@@ -19,6 +19,7 @@ import (
 	"github.com/osarogie/mindbase/internal/ui"
 	uistatic "github.com/osarogie/mindbase/internal/ui/static"
 	"github.com/osarogie/mindbase/internal/vault"
+	"github.com/osarogie/mindbase/internal/vaultparse"
 	"github.com/osarogie/mindbase/internal/watcher"
 	"github.com/osarogie/mindbase/internal/webui"
 )
@@ -147,6 +148,9 @@ func (s *Server) Router() http.Handler {
 		r.Delete("/*", s.handleDeleteNote)
 	})
 
+	// Reverse references: which notes link to the given note via [[wiki-links]].
+	r.Get("/api/backlinks/*", s.handleBacklinks)
+
 	r.Route("/api/databases", func(r chi.Router) {
 		r.Get("/", s.handleListDatabases)
 		r.Get("/*", s.handleDatabaseRoute)
@@ -237,6 +241,16 @@ func (s *Server) handleGetNote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, note)
+}
+
+func (s *Server) handleBacklinks(w http.ResponseWriter, r *http.Request) {
+	path := chi.URLParam(r, "*")
+	links, err := vaultparse.FindBacklinks(s.vault, path)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeJSON(w, links)
 }
 
 func (s *Server) handleSaveNote(w http.ResponseWriter, r *http.Request) {

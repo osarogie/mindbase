@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Save, Trash2, Eye, Edit3, FileCode2, MessageSquare, Columns2, ListTree, History } from 'lucide-react'
+import { Save, Trash2, Eye, Edit3, FileCode2, MessageSquare, Columns2, ListTree, History, Link2 } from 'lucide-react'
 import { attachmentMarkdownPath } from '@mindbase/editor-ui/attachments/host'
 import type { BridgeMessage } from '@mindbase/editor-ui/bridge'
 import { api, AttachmentEntry, connectWS } from '../api'
+import { BacklinksPanel } from './BacklinksPanel'
 import { CommentsRail } from './CommentsRail'
 import { HistoryDialog } from './HistoryDialog'
 import { OutlinePanel } from './OutlinePanel'
@@ -25,6 +26,7 @@ export function NoteView({ path, onDeleted }: Props) {
   const [attachments, setAttachments] = useState<AttachmentEntry[]>([])
   const [status, setStatus] = useState('')
   const [commentsOpen, setCommentsOpen] = useState(false)
+  const [backlinksOpen, setBacklinksOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
   // Open by default on desktop; collapsed on small screens (where it overlays).
   const [outlineOpen, setOutlineOpen] = useState(
@@ -33,14 +35,25 @@ export function NoteView({ path, onDeleted }: Props) {
   const mdRef = useRef<MarkdownEditorHandle>(null)
 
   const load = useCallback(async () => {
-    const note = await api.notes.get(path)
-    setContent(note.content)
-    setSaved(note.content)
-    const files = await api.attachments.list(path)
+    try {
+      const note = await api.notes.get(path)
+      setContent(note.content)
+      setSaved(note.content)
+    } catch {
+      // Following a [[wiki-link]] to a note that doesn't exist yet: start a
+      // blank draft titled from the filename. `saved` stays empty so the draft
+      // is dirty and saving creates the file.
+      const title = path.replace(/\.md$/, '').split('/').pop() ?? 'Untitled'
+      setContent(`# ${title}\n\n`)
+      setSaved('')
+      setStatus('New note — start typing, then save to create it.')
+    }
+    const files = await api.attachments.list(path).catch(() => [])
     setAttachments(files)
   }, [path])
 
   useEffect(() => {
+    setStatus('')
     load().catch((e) => setStatus(String(e)))
   }, [load])
 
@@ -161,6 +174,15 @@ export function NoteView({ path, onDeleted }: Props) {
           </button>
           <button
             type="button"
+            className={`icon-btn ${backlinksOpen ? 'is-active' : ''}`}
+            title="Backlinks"
+            aria-label="Backlinks"
+            onClick={() => setBacklinksOpen((v) => !v)}
+          >
+            <Link2 size={16} />
+          </button>
+          <button
+            type="button"
             className={`icon-btn ${commentsOpen ? 'is-active' : ''}`}
             title="Comments"
             aria-label="Comments"
@@ -197,6 +219,7 @@ export function NoteView({ path, onDeleted }: Props) {
           )}
         </div>
         {outlineOpen && <OutlinePanel onClose={() => setOutlineOpen(false)} />}
+        {backlinksOpen && <BacklinksPanel notePath={path} onClose={() => setBacklinksOpen(false)} />}
         <CommentsRail open={commentsOpen} onClose={() => setCommentsOpen(false)} />
       </div>
 

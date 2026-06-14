@@ -16,8 +16,21 @@ export function systemTheme(): Theme {
     : 'light'
 }
 
+/** Event fired on <window> whenever the active theme changes. */
+export const THEME_EVENT = 'mindbase-theme'
+
 export function applyTheme(theme: Theme): void {
   document.documentElement.classList.toggle('dark', theme === 'dark')
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent<Theme>(THEME_EVENT, { detail: theme }))
+  }
+}
+
+/** The currently-applied theme, read from the <html> class. */
+export function currentTheme(): Theme {
+  return typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
+    ? 'dark'
+    : 'light'
 }
 
 /** Resolve + apply the initial theme (stored override, else OS). Call at startup. */

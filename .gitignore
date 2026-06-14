@@ -27,6 +27,7 @@ web/package-lock.json
 mobile/package-lock.json
 .cursor/
 .serena/
+.zed/
 # Top-level vault data dir only — anchored so it doesn't also match internal/vault/.
 /vault/
 /.expo

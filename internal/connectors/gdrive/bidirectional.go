@@ -121,14 +121,17 @@ func SyncWithModeJSON(v *vault.Vault, store *cache.Store, credJSON, tokenJSON, f
 
 	if notes {
 		_ = filepath.WalkDir(v.NotesRoot(), func(path string, d os.DirEntry, err error) error {
-			if err != nil || d.IsDir() {
+			if err != nil {
+				return nil
+			}
+			if d.IsDir() {
+				if vault.IsSkippableDir(d.Name()) {
+					return filepath.SkipDir
+				}
 				return nil
 			}
 			ext := filepath.Ext(path)
 			if ext != ".md" && ext != ".excalidraw" {
-				return nil
-			}
-			if strings.Contains(path, ".attachments") {
 				return nil
 			}
 			rel, _ := filepath.Rel(v.NotesRoot(), path)
@@ -159,24 +162,33 @@ func SyncWithModeJSON(v *vault.Vault, store *cache.Store, credJSON, tokenJSON, f
 	}
 
 	if databases {
-		entries, _ := os.ReadDir(v.DatabasesRoot())
-		for _, e := range entries {
-			if e.IsDir() || !strings.HasSuffix(e.Name(), ".csv") {
-				continue
-			}
-			path := filepath.Join(v.DatabasesRoot(), e.Name())
-			rel := "databases/" + e.Name()
-			info, err := e.Info()
+		_ = filepath.WalkDir(v.DatabasesRoot(), func(path string, d os.DirEntry, err error) error {
 			if err != nil {
-				continue
+				return nil
+			}
+			if d.IsDir() {
+				if vault.IsSkippableDir(d.Name()) {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if filepath.Ext(path) != ".csv" {
+				return nil
+			}
+			// Root-relative key now that databases share the flat content root.
+			rel, _ := filepath.Rel(v.DatabasesRoot(), path)
+			rel = filepath.ToSlash(rel)
+			info, err := d.Info()
+			if err != nil {
+				return nil
 			}
 			cached, hasCache := idx.GDrive.Files[rel]
 			if hasCache && !info.ModTime().After(cached.LocalMod) && cached.DriveID != "" {
-				continue
+				return nil
 			}
 			if err := uploadFile(ctx, svc, folderID, pushIndex, rel, path, res); err != nil {
 				res.Errors = append(res.Errors, fmt.Sprintf("push %s: %v", rel, err))
-				continue
+				return nil
 			}
 			entry := cache.GDriveFileEntry{
 				DriveID:      pushIndex[rel],
@@ -187,7 +199,8 @@ func SyncWithModeJSON(v *vault.Vault, store *cache.Store, credJSON, tokenJSON, f
 				entry.RemoteMod, _ = time.Parse(time.RFC3339, remote.ModifiedTime)
 			}
 			idx.GDrive.Files[rel] = entry
-		}
+			return nil
+		})
 	}
 	}
 
@@ -251,15 +264,16 @@ func downloadFile(ctx context.Context, svc *drive.Service, fileID, dest string) 
 }
 
 func resolveLocalPath(v *vault.Vault, rel string) (string, error) {
-	if strings.HasPrefix(rel, "databases/") {
-		name := strings.TrimPrefix(rel, "databases/")
-		return v.ResolveDatabasePath(strings.TrimSuffix(name, ".csv"))
+	// Single flat root: classify by extension. (Legacy databases/-prefixed keys
+	// still end in .csv, so they resolve as databases too.)
+	if filepath.Ext(rel) == ".csv" {
+		return v.ResolveDatabasePath(strings.TrimSuffix(rel, ".csv"))
 	}
 	return v.ResolveNotePath(rel)
 }
 
 func shouldPull(rel string, notes, databases bool) bool {
-	if strings.HasPrefix(rel, "databases/") {
+	if filepath.Ext(rel) == ".csv" {
 		return databases
 	}
 	return notes

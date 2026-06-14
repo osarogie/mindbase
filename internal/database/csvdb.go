@@ -44,6 +44,9 @@ func (s *Service) List() ([]Entry, error) {
 			return err
 		}
 		if d.IsDir() {
+			if vault.IsSkippableDir(d.Name()) {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		if !strings.HasSuffix(d.Name(), ".csv") {

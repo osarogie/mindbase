@@ -39,39 +39,35 @@ func NewService(v *vault.Vault) *Service {
 func (s *Service) ChangesSince(since time.Time) ([]Change, error) {
 	var changes []Change
 
-	notesRoot := s.vault.NotesRoot()
-	_ = filepath.WalkDir(notesRoot, func(path string, d os.DirEntry, err error) error {
-		if err != nil || d.IsDir() {
+	// Single flat root: one walk covers notes (.md/.excalidraw) and databases (.csv).
+	root := s.vault.NotesRoot()
+	_ = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
 			return nil
 		}
-		if strings.HasSuffix(d.Name(), ".attachments") {
+		if d.IsDir() {
+			if vault.IsSkippableDir(d.Name()) {
+				return filepath.SkipDir
+			}
 			return nil
 		}
-		ext := filepath.Ext(path)
-		if ext != ".md" && ext != ".excalidraw" {
+		var typ string
+		switch filepath.Ext(path) {
+		case ".md", ".excalidraw":
+			typ = "note"
+		case ".csv":
+			typ = "database"
+		default:
 			return nil
 		}
 		info, err := d.Info()
 		if err != nil || !info.ModTime().After(since) {
 			return nil
 		}
-		rel, _ := filepath.Rel(notesRoot, path)
-		changes = append(changes, fileChange(filepath.ToSlash(rel), "note", info))
+		rel, _ := filepath.Rel(root, path)
+		changes = append(changes, fileChange(filepath.ToSlash(rel), typ, info))
 		return nil
 	})
-
-	dbRoot := s.vault.DatabasesRoot()
-	entries, _ := os.ReadDir(dbRoot)
-	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".csv") {
-			continue
-		}
-		info, err := e.Info()
-		if err != nil || !info.ModTime().After(since) {
-			continue
-		}
-		changes = append(changes, fileChange(e.Name(), "database", info))
-	}
 
 	return changes, nil
 }

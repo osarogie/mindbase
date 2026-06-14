@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/osarogie/mindbase/internal/markdown"
@@ -44,7 +43,7 @@ func (s *Service) List() ([]Entry, error) {
 			return err
 		}
 		if d.IsDir() {
-			if strings.HasSuffix(d.Name(), ".attachments") {
+			if vault.IsSkippableDir(d.Name()) {
 				return filepath.SkipDir
 			}
 			return nil

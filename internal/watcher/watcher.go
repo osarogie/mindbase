@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"path/filepath"
-	"strings"
 	"sync"
 
 	"github.com/fsnotify/fsnotify"
@@ -103,10 +102,12 @@ func (w *Watcher) broadcast(event fsnotify.Event) {
 	}
 	rel = filepath.ToSlash(rel)
 
+	// Single flat root: classify by file extension rather than folder.
 	eventType := "changed"
-	if strings.Contains(rel, vault.NotesDir) {
+	switch filepath.Ext(rel) {
+	case ".md", ".excalidraw":
 		eventType = "note"
-	} else if strings.Contains(rel, vault.DatabasesDir) {
+	case ".csv":
 		eventType = "database"
 	}
 

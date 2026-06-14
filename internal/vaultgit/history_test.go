@@ -12,10 +12,7 @@ func TestLogAndStatus(t *testing.T) {
 		t.Skip("git not installed")
 	}
 	root := t.TempDir()
-	notePath := filepath.Join(root, "notes", "alpha.md")
-	if err := os.MkdirAll(filepath.Dir(notePath), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	notePath := filepath.Join(root, "alpha.md")
 	if err := os.WriteFile(notePath, []byte("# alpha\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -75,10 +72,7 @@ func TestFileAtRev(t *testing.T) {
 		t.Skip("git not installed")
 	}
 	root := t.TempDir()
-	notePath := filepath.Join(root, "notes", "alpha.md")
-	if err := os.MkdirAll(filepath.Dir(notePath), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	notePath := filepath.Join(root, "alpha.md")
 	if err := os.WriteFile(notePath, []byte("# v1\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}

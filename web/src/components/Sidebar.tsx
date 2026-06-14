@@ -10,6 +10,8 @@ import { cn } from '@/lib/utils'
 interface Props {
   notes: NoteEntry[]
   databases: DatabaseEntry[]
+  loading: boolean
+  error?: string
   open: boolean
   vaultName?: string
   onToggle: () => void
@@ -20,6 +22,8 @@ interface Props {
 export function Sidebar({
   notes,
   databases,
+  loading,
+  error,
   open,
   vaultName,
   onToggle,
@@ -82,6 +86,15 @@ export function Sidebar({
           <Plus size={16} /> New note
         </Button>
         <ul className="item-list flex-1 overflow-y-auto">
+          {error && (
+            <li className="item-list-empty item-list-error">
+              Couldn’t load the vault. Check the server and retry.
+            </li>
+          )}
+          {!error && loading && <li className="item-list-empty">Loading notes…</li>}
+          {!error && !loading && notes.length === 0 && (
+            <li className="item-list-empty">No notes yet. Create your first note above.</li>
+          )}
           {notes.map((n) => (
             <li key={n.path}>
               <button
@@ -101,6 +114,10 @@ export function Sidebar({
           <Plus size={16} /> New database
         </Button>
         <ul className="item-list max-h-48 overflow-y-auto border-t border-border">
+          {!error && loading && <li className="item-list-empty">Loading…</li>}
+          {!error && !loading && databases.length === 0 && (
+            <li className="item-list-empty">No databases yet.</li>
+          )}
           {databases.map((d) => (
             <li key={d.name}>
               <button

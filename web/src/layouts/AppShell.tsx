@@ -9,20 +9,31 @@ export function AppShell() {
   const [databases, setDatabases] = useState<DatabaseEntry[]>([])
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [vaultName, setVaultName] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   const refresh = useCallback(async () => {
-    const [n, d, v] = await Promise.all([
-      api.notes.list(),
-      api.databases.list(),
-      api.vault(),
-    ])
-    setNotes(n)
-    setDatabases(d)
-    setVaultName(v.name)
+    setError('')
+    try {
+      const [n, d, v] = await Promise.all([
+        api.notes.list(),
+        api.databases.list(),
+        api.vault(),
+      ])
+      setNotes(n)
+      setDatabases(d)
+      setVaultName(v.name)
+    } catch (e) {
+      // Surface the failure instead of letting the empty lists read as
+      // "No notes yet" — the sidebar shows an error rather than an empty state.
+      setError(String(e))
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => {
-    refresh().catch(console.error)
+    void refresh()
   }, [refresh])
 
   const newNote = async () => {
@@ -47,6 +58,8 @@ export function AppShell() {
       <Sidebar
         notes={notes}
         databases={databases}
+        loading={loading}
+        error={error}
         open={sidebarOpen}
         vaultName={vaultName}
         onToggle={() => setSidebarOpen((o) => !o)}

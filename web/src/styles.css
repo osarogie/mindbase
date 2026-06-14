@@ -159,6 +159,12 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .item-list span { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .item-list small { color: var(--muted-foreground); font-size: 0.75rem; }
+.item-list-empty {
+  padding: 0.5rem 0.6rem;
+  color: var(--muted-foreground);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
 
 .main {
   flex: 1;

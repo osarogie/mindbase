@@ -9,16 +9,21 @@ export function AppShell() {
   const [databases, setDatabases] = useState<DatabaseEntry[]>([])
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [vaultName, setVaultName] = useState('')
+  const [loading, setLoading] = useState(true)
 
   const refresh = useCallback(async () => {
-    const [n, d, v] = await Promise.all([
-      api.notes.list(),
-      api.databases.list(),
-      api.vault(),
-    ])
-    setNotes(n)
-    setDatabases(d)
-    setVaultName(v.name)
+    try {
+      const [n, d, v] = await Promise.all([
+        api.notes.list(),
+        api.databases.list(),
+        api.vault(),
+      ])
+      setNotes(n)
+      setDatabases(d)
+      setVaultName(v.name)
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => {
@@ -47,6 +52,7 @@ export function AppShell() {
       <Sidebar
         notes={notes}
         databases={databases}
+        loading={loading}
         open={sidebarOpen}
         vaultName={vaultName}
         onToggle={() => setSidebarOpen((o) => !o)}
